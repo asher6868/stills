@@ -188,8 +188,84 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
   );
 }
 
+// RotatedImage — handles rotation by measuring container and fitting image correctly
+function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
+  const outerRef = useRef(null);
+  const [natural, setNatural] = useState(null); // natural image dimensions
+  const [containerSize, setContainerSize] = useState(null);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const measure = () => setContainerSize({ w: el.offsetWidth, h: el.offsetHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const isRotated = rotation === 90 || rotation === 270;
+
+  // Once we have both natural size and container size, calculate display size
+  let displayW = "auto", displayH = "auto";
+  if (natural && containerSize) {
+    const imgW = natural.w;
+    const imgH = natural.h;
+    const cw = containerSize.w;
+    const ch = containerSize.h;
+
+    if (isRotated) {
+      // After rotation, image visual width = imgH, visual height = imgW
+      // Fit this rotated size into container
+      const scaleW = cw / imgH;
+      const scaleH = ch / imgW;
+      const scale = Math.min(scaleW, scaleH);
+      displayW = imgW * scale;
+      displayH = imgH * scale;
+    } else {
+      const scaleW = cw / imgW;
+      const scaleH = ch / imgH;
+      const scale = Math.min(scaleW, scaleH);
+      displayW = imgW * scale;
+      displayH = imgH * scale;
+    }
+  }
+
+  return (
+    <div ref={outerRef} style={{
+      width: "100%", height: "100%",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      overflow: "hidden", position: "relative",
+    }}>
+      <img
+        ref={imgRef}
+        id="stills-img"
+        src={image}
+        alt="editing"
+        onLoad={e => {
+          const img = e.target;
+          setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+          setImgSize && setImgSize({ w: img.naturalWidth, h: img.naturalHeight });
+        }}
+        style={{
+          width: displayW,
+          height: displayH,
+          display: "block",
+          filter,
+          transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
+          transition: "filter 0.25s ease, transform 0.3s ease",
+          userSelect: "none",
+          flexShrink: 0,
+          maxWidth: "none",
+          maxHeight: "none",
+        }}
+      />
+    </div>
+  );
+}
+
 // CropDisplay — reliable crop preview
-function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette }) {
+function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
   const outerRef = useRef(null);
   const [dims, setDims] = useState(null);
 
@@ -247,7 +323,7 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
               maxHeight: "none",
               display: "block",
               filter,
-              transform: `rotate(${rotation}deg)`,
+              transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
               userSelect: "none",
             }}
           />
@@ -265,7 +341,7 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
           src={image}
           alt="editing"
           onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
-          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block", filter, transform: `rotate(${rotation}deg)`, userSelect: "none" }}
+          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block", filter, transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`, userSelect: "none" }}
         />
       )}
     </div>
@@ -1862,37 +1938,17 @@ export default function Stills() {
                     imgRef={imgRef}
                     setImgSize={setImgSize}
                     vignette={vignette}
+                    warp={warp}
                   />
                 ) : (
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: "100%",
-                    height: "100%",
-                    overflow: "hidden",
-                  }}>
-                    <img
-                      ref={imgRef}
-                      id="stills-img"
-                      src={image}
-                      alt="editing"
-                      onLoad={e => setImgSize({ w: e.target.offsetWidth, h: e.target.offsetHeight })}
-                      style={{
-                        maxWidth: (rotation === 90 || rotation === 270) ? "60vh" : "100%",
-                        maxHeight: (rotation === 90 || rotation === 270) ? "60vw" : "100%",
-                        width: "auto",
-                        height: "auto",
-                        objectFit: "contain",
-                        display: "block",
-                        filter: compositeFilter(),
-                        transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
-                        transition: "filter 0.25s ease, transform 0.3s ease",
-                        userSelect: "none",
-                        flexShrink: 0,
-                      }}
-                    />
-                  </div>
+                  <RotatedImage
+                    imgRef={imgRef}
+                    image={image}
+                    rotation={rotation}
+                    filter={compositeFilter()}
+                    setImgSize={setImgSize}
+                    warp={warp}
+                  />
                 )}
 
                 {/* Crop overlay — only shown when editing */}
@@ -2100,7 +2156,7 @@ export default function Stills() {
                     maxWidth: "95vw", maxHeight: "95vh",
                     objectFit: "contain",
                     filter: compositeFilter(),
-                    transform: `rotate(${rotation}deg)`,
+                    transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
                     ...(crop ? {
                       clipPath: `inset(${crop.y * 100}% ${(1 - crop.x - crop.w) * 100}% ${(1 - crop.y - crop.h) * 100}% ${crop.x * 100}%)`,
                     } : {}),
@@ -2218,11 +2274,16 @@ export default function Stills() {
 
           {/* Distort */}
           <Panel title="Distort">
+            {cropEditing && (
+              <div style={{ fontSize: 9, color: "#C0392B", letterSpacing: "0.08em", marginBottom: 8, lineHeight: 1.6 }}>
+                Finish crop first — hit Done
+              </div>
+            )}
             {[
               { label: "Horizontal", key: "x", val: warp.x },
               { label: "Vertical",   key: "y", val: warp.y },
             ].map(({ label, key, val }) => (
-              <div key={key} style={{ marginBottom: 10 }}>
+              <div key={key} style={{ marginBottom: 10, opacity: cropEditing ? 0.3 : 1, pointerEvents: cropEditing ? "none" : "all" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                   <span style={{ fontSize: 10, color: "#777", letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
                   <span
