@@ -1769,11 +1769,11 @@ export default function Stills() {
                 {/* Image — wrapped for proper crop centering */}
                 {crop && !cropEditing ? (
                   <div style={{
-                    width: "100%",
-                    height: "100%",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
                     overflow: "hidden",
                   }}>
                     <img
@@ -1783,12 +1783,12 @@ export default function Stills() {
                       alt="editing"
                       onLoad={e => setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
                       style={{
-                        // Fill the canvas using the crop region only
-                        width: `${(1 / crop.w) * 100}%`,
-                        height: `${(1 / crop.h) * 100}%`,
+                        // Size image so the crop region fits the available space
                         maxWidth: `${(1 / crop.w) * 100}%`,
                         maxHeight: `${(1 / crop.h) * 100}%`,
-                        objectFit: "cover",
+                        width: `${(1 / crop.w) * 100}%`,
+                        height: `${(1 / crop.h) * 100}%`,
+                        objectFit: "contain",
                         objectPosition: `${-crop.x / crop.w * 100}% ${-crop.y / crop.h * 100}%`,
                         filter: compositeFilter(),
                         transform: `rotate(${rotation}deg)`,
