@@ -408,19 +408,40 @@ export default function Stills() {
     if (!image) return;
     setExporting(true);
     triggerGlitch();
-    const canvas = document.createElement("canvas");
+
     const img = new Image();
     img.src = image;
     await new Promise((res) => { img.onload = res; });
+
     const isRotated90 = rotation === 90 || rotation === 270;
-    canvas.width  = isRotated90 ? img.naturalHeight : img.naturalWidth;
-    canvas.height = isRotated90 ? img.naturalWidth  : img.naturalHeight;
+    const fullW = isRotated90 ? img.naturalHeight : img.naturalWidth;
+    const fullH = isRotated90 ? img.naturalWidth  : img.naturalHeight;
+
+    // Apply crop to determine final canvas dimensions
+    const cropX      = crop ? Math.round(crop.x * fullW) : 0;
+    const cropY      = crop ? Math.round(crop.y * fullH) : 0;
+    const cropW      = crop ? Math.round(crop.w * fullW) : fullW;
+    const cropH      = crop ? Math.round(crop.h * fullH) : fullH;
+
+    // Step 1 — draw full rotated + filtered image to a temp canvas
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width  = fullW;
+    tempCanvas.height = fullH;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.translate(fullW / 2, fullH / 2);
+    tempCtx.rotate((rotation * Math.PI) / 180);
+    tempCtx.filter = compositeFilter();
+    tempCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    tempCtx.filter = "none";
+
+    // Step 2 — crop from temp canvas into final canvas
+    const canvas = document.createElement("canvas");
+    canvas.width  = cropW;
+    canvas.height = cropH;
     const ctx = canvas.getContext("2d");
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.filter = compositeFilter();
-    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-    ctx.filter = "none";
+    ctx.drawImage(tempCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+    // Step 3 — grain
     if (grain !== "none") {
       const intensity = GRAIN_INTENSITY[grain];
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -433,6 +454,8 @@ export default function Stills() {
       }
       ctx.putImageData(imageData, 0, 0);
     }
+
+    // Step 4 — vignette
     if (vignette) {
       const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, canvas.height*0.3, canvas.width/2, canvas.height/2, canvas.height*0.85);
       grad.addColorStop(0, "rgba(0,0,0,0)");
