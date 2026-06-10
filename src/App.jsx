@@ -568,6 +568,10 @@ export default function Stills() {
     setExporting(true);
     triggerGlitch();
 
+    // Capture current state values to avoid stale closure
+    const currentWarpX = warp.x;
+    const currentWarpY = warp.y;
+
     const img = new Image();
     img.src = image;
     await new Promise((res) => { img.onload = res; });
@@ -594,11 +598,15 @@ export default function Stills() {
     tempCtx.filter = "none";
 
     // Step 2 — crop from temp canvas into final canvas
+    const preCropW = cropW;
+    const preCropH = cropH;
     const canvas = document.createElement("canvas");
-    canvas.width  = cropW;
-    canvas.height = cropH;
+    // Apply warp to final canvas dimensions
+    canvas.width  = Math.round(preCropW * (currentWarpX / 100));
+    canvas.height = Math.round(preCropH * (currentWarpY / 100));
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(tempCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    // Draw and scale to apply distort
+    ctx.drawImage(tempCanvas, cropX, cropY, preCropW, preCropH, 0, 0, canvas.width, canvas.height);
 
     // Step 3 — grain
     if (grain !== "none") {
