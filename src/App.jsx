@@ -188,12 +188,15 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
   );
 }
 
-// CropDisplay — simple, reliable crop preview
+// CropDisplay — shows cropped region centered at natural proportions
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette }) {
   return (
     <div style={{
       width: "100%",
       height: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
       position: "relative",
     }}>
       <img
@@ -203,14 +206,18 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
         alt="editing"
         onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
         style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: `${crop.x * 100}% ${crop.y * 100}%`,
+          // Scale image so crop region fills as much space as possible
+          maxWidth: `${100 / crop.w}%`,
+          maxHeight: `${100 / crop.h}%`,
+          width: "auto",
+          height: "auto",
+          objectFit: "contain",
           display: "block",
           filter,
           transform: `rotate(${rotation}deg)`,
           userSelect: "none",
+          // Clip to show only the crop region
+          clipPath: `inset(${crop.y * 100}% ${(1 - crop.x - crop.w) * 100}% ${(1 - crop.y - crop.h) * 100}% ${crop.x * 100}%)`,
         }}
       />
       {vignette && (
@@ -2108,42 +2115,6 @@ export default function Stills() {
                 >{p.label}</Win3Button>
               ))}
             </div>
-
-            {/* Fine-tune sliders when crop is active */}
-            {crop && <>
-              <div style={{ fontSize: 9, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Fine Tune</div>
-              {[
-                { label: "Left",   val: Math.round(crop.x * 100),   onChange: v => { const x = v/100; setCrop(c => ({ ...c, x, w: Math.min(c.w, 1 - x) })); }, def: 10 },
-                { label: "Top",    val: Math.round(crop.y * 100),   onChange: v => { const y = v/100; setCrop(c => ({ ...c, y, h: Math.min(c.h, 1 - y) })); }, def: 10 },
-                { label: "Width",  val: Math.round(crop.w * 100),   onChange: v => { const w = v/100; setCrop(c => ({ ...c, w: Math.min(w, 1 - c.x), ...(c.ratio ? { h: Math.min(w/c.ratio, 1 - c.y) } : {}) })); }, def: 80 },
-                { label: "Height", val: Math.round(crop.h * 100),   onChange: v => { const h = v/100; setCrop(c => c.ratio ? c : ({ ...c, h: Math.min(h, 1 - c.y) })); }, def: 80 },
-              ].map(({ label, val, onChange, def }) => (
-                <div key={label} style={{ marginBottom: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                    <span style={{ fontSize: 9, color: "#666", letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
-                    <span
-                      style={{ fontSize: 9, color: "#888", cursor: "pointer" }}
-                      onDoubleClick={() => onChange(def)}
-                      title="Double-click to reset"
-                    >{val}%</span>
-                  </div>
-                  <div style={{ ...sunken, padding: "2px 4px", background: "#111" }}>
-                    <input type="range" min={0} max={90} value={val}
-                      onChange={e => onChange(Number(e.target.value))}
-                      onDoubleClick={() => onChange(def)}
-                      style={{
-                        width: "100%", height: 2, appearance: "none",
-                        background: `linear-gradient(to right, #C0392B ${val/90*100}%, #2a2a2a ${val/90*100}%)`,
-                        outline: "none", cursor: "pointer", display: "block",
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-              <div style={{ fontSize: 9, color: "#444", letterSpacing: "0.06em", marginBottom: 8 }}>
-                {Math.round(crop.w * 100)}% × {Math.round(crop.h * 100)}%
-              </div>
-            </>}
 
             <div style={{ display: "flex", gap: 4 }}>
               {!crop ? (
