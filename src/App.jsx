@@ -275,9 +275,8 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     const ph = el.getBoundingClientRect().height;
     if (!pw || !ph) return;
 
-    const isRotated = rotation === 90 || rotation === 270;
-    // When rotated 90/270, the crop's visual aspect ratio flips
-    const cropAspect = isRotated ? crop.h / crop.w : crop.w / crop.h;
+    // Crop aspect ratio is always based on original image coordinates, not rotation
+    const cropAspect = crop.w / crop.h;
     const canvasAspect = pw / ph;
 
     let winW, winH;
@@ -287,13 +286,12 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
       winH = ph; winW = ph * cropAspect;
     }
 
-    // For rotated images, the image offset and size also need to swap
-    const fullW = isRotated ? winH / crop.w : winW / crop.w;
-    const fullH = isRotated ? winW / crop.h : winH / crop.h;
-    const offX = isRotated ? -crop.x * fullW : -crop.x * fullW;
-    const offY = isRotated ? -crop.y * fullH : -crop.y * fullH;
+    const fullW = winW / crop.w;
+    const fullH = winH / crop.h;
+    const offX = -crop.x * fullW;
+    const offY = -crop.y * fullH;
     setDims({ winW, winH, fullW, fullH, offX, offY });
-  }, [crop.x, crop.y, crop.w, crop.h, rotation]);
+  }, [crop.x, crop.y, crop.w, crop.h]);
 
   useEffect(() => {
     measure();
@@ -2274,16 +2272,11 @@ export default function Stills() {
 
           {/* Distort */}
           <Panel title="Distort">
-            {cropEditing && (
-              <div style={{ fontSize: 9, color: "#C0392B", letterSpacing: "0.08em", marginBottom: 8, lineHeight: 1.6 }}>
-                Finish crop first — hit Done
-              </div>
-            )}
             {[
               { label: "Horizontal", key: "x", val: warp.x },
               { label: "Vertical",   key: "y", val: warp.y },
             ].map(({ label, key, val }) => (
-              <div key={key} style={{ marginBottom: 10, opacity: cropEditing ? 0.3 : 1, pointerEvents: cropEditing ? "none" : "all" }}>
+              <div key={key} style={{ marginBottom: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                   <span style={{ fontSize: 10, color: "#777", letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
                   <span
