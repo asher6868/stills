@@ -202,6 +202,7 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     const cropAspect = crop.w / crop.h;
     const canvasAspect = pw / ph;
     let winW, winH;
+    // Contain — respect crop dimensions, fill as much space as possible
     if (cropAspect > canvasAspect) {
       winW = pw; winH = pw / cropAspect;
     } else {
