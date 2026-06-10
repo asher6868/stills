@@ -188,6 +188,71 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
   );
 }
 
+// CropDisplay — measures parent container and sizes crop correctly
+function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize }) {
+  const containerRef = useRef(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      setSize({ w: el.offsetWidth, h: el.offsetHeight });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Calculate container size that fits crop aspect ratio within available space
+  const cropAspect = crop.w / crop.h;
+  const availAspect = size.w / (size.h || 1);
+  let boxW, boxH;
+  if (cropAspect > availAspect) {
+    boxW = size.w;
+    boxH = size.w / cropAspect;
+  } else {
+    boxH = size.h;
+    boxW = size.h * cropAspect;
+  }
+
+  return (
+    <div ref={containerRef} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      {size.w > 0 && (
+        <div style={{
+          position: "relative",
+          width: boxW,
+          height: boxH,
+          overflow: "hidden",
+          flexShrink: 0,
+        }}>
+          <img
+            ref={imgRef}
+            id="stills-img"
+            src={image}
+            alt="editing"
+            onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+            style={{
+              position: "absolute",
+              width: `${(1 / crop.w) * 100}%`,
+              height: `${(1 / crop.h) * 100}%`,
+              left: `${-(crop.x / crop.w) * 100}%`,
+              top: `${-(crop.y / crop.h) * 100}%`,
+              filter,
+              transform: `rotate(${rotation}deg)`,
+              userSelect: "none",
+              display: "block",
+              maxWidth: "none",
+              maxHeight: "none",
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Stills() {
   const [screen, setScreen] = useState("splash");
   const [showAbout, setShowAbout] = useState(false);
@@ -1768,37 +1833,14 @@ export default function Stills() {
               >
                 {/* Image — crop display */}
                 {crop && !cropEditing ? (
-                  <div style={{
-                    position: "relative",
-                    overflow: "hidden",
-                    // Use aspect-ratio CSS to let browser size it correctly within flex container
-                    aspectRatio: `${crop.w} / ${crop.h}`,
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    flexShrink: 1,
-                    flexGrow: 0,
-                  }}>
-                    <img
-                      ref={imgRef}
-                      id="stills-img"
-                      src={image}
-                      alt="editing"
-                      onLoad={e => setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-                      style={{
-                        position: "absolute",
-                        width: `${(1 / crop.w) * 100}%`,
-                        height: `${(1 / crop.h) * 100}%`,
-                        left: `${-(crop.x / crop.w) * 100}%`,
-                        top: `${-(crop.y / crop.h) * 100}%`,
-                        filter: compositeFilter(),
-                        transform: `rotate(${rotation}deg)`,
-                        userSelect: "none",
-                        display: "block",
-                        maxWidth: "none",
-                        maxHeight: "none",
-                      }}
-                    />
-                  </div>
+                  <CropDisplay
+                    image={image}
+                    crop={crop}
+                    rotation={rotation}
+                    filter={compositeFilter()}
+                    imgRef={imgRef}
+                    setImgSize={setImgSize}
+                  />
                 ) : (
                   <img
                     ref={imgRef}
