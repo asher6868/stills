@@ -218,6 +218,7 @@ export default function Stills() {
   const [lightbox, setLightbox] = useState(false);
   const [showRefreshWarning, setShowRefreshWarning] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [splashDest, setSplashDest] = useState("landing");
   const [imgSize, setImgSize] = useState(null); // {w, h} rendered px size
   const fileInputRef = useRef(null);
   const cropRef = useRef(null);
@@ -309,7 +310,7 @@ export default function Stills() {
         filterName: FILTERS.find(f => f.id === activeFilter)?.name || activeFilter,
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         filename: imageFile?.name || "image",
-        editState: { activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop, cropEditing: false },
+        editState: { activeFilter, brightness, contrast, saturation, grain, vignette: !!vignette, rotation, negative: !!negative, crop, cropEditing: false },
       };
 
       if (!currentEditId) {
@@ -335,13 +336,13 @@ export default function Stills() {
     } catch {}
   }, [image, activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop]);
 
-  // Auto-advance from splash to landing after 3.5s
+  // Auto-advance from splash to correct destination after 3.5s
   useEffect(() => {
     if (screen === "splash") {
-      const t = setTimeout(() => setScreen("landing"), 3500);
+      const t = setTimeout(() => setScreen(splashDest), 3500);
       return () => clearTimeout(t);
     }
-  }, [screen]);
+  }, [screen, splashDest]);
 
   const currentFilter = FILTERS.find((f) => f.id === activeFilter);
 
@@ -475,30 +476,24 @@ export default function Stills() {
   };
 
   const navigateTo = (dest) => {
-    // If leaving editor with an active image, ask to save
     if (screen === "editor" && image && dest !== "editor") {
       setPendingNav(dest);
       setShowSavePrompt(true);
       return;
     }
+    setSplashDest(dest);
     setScreen("splash");
-    setTimeout(() => setScreen(dest), 3500);
   };
 
   const confirmNav = (save) => {
     setShowSavePrompt(false);
-    if (save && image) {
-      // ensure current state is already in darkroom (it should be via autosave)
-      // just proceed
-    }
     if (!save && currentEditId) {
-      // remove the autosaved entry since user chose not to save
       setDarkroom(prev => prev.filter(d => d.id !== currentEditId));
     }
     const dest = pendingNav;
     setPendingNav(null);
+    setSplashDest(dest);
     setScreen("splash");
-    setTimeout(() => setScreen(dest), 3500);
   };
 
   const resetAdjustments = () => {
@@ -1034,7 +1029,7 @@ export default function Stills() {
               setNegative(false);
               setCrop(null);
               setScreen("splash");
-              setTimeout(() => setScreen("editor"), 3500);
+              setSplashDest("editor"); setScreen("splash");
             }} style={{
               background: "#1a1a1a", border: "1px solid #3a3a3a", color: "#888",
               fontFamily: F2, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
@@ -1130,7 +1125,7 @@ export default function Stills() {
                 setSaturation(100); setGrain("none"); setVignette(false);
                 setRotation(0); setNegative(false); setCrop(null);
                 setScreen("splash");
-                setTimeout(() => setScreen("editor"), 3500);
+                setSplashDest("editor"); setScreen("splash");
               }} style={{
                 marginTop: 8, background: "#222",
                 borderTop: "2px solid #4a4a4a", borderLeft: "2px solid #4a4a4a",
@@ -1187,7 +1182,7 @@ export default function Stills() {
                         setTimeout(() => setNegative(false), 50);
                       }
                       setScreen("splash");
-                      setTimeout(() => setScreen("editor"), 3500);
+                      setSplashDest("editor"); setScreen("splash");
                     }}
                     style={{
                       background: "#222",
