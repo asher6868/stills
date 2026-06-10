@@ -188,78 +188,48 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
   );
 }
 
-// CropDisplay — wrapper sized to crop region, image offset inside
+// CropDisplay — scales image so crop fills canvas, clips outside, stays centered
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette }) {
-  const outerRef = useRef(null);
-  const [box, setBox] = useState({ w: 0, h: 0 });
+  // Scale factor: make the crop region fill 100% of the available space
+  const scaleX = 1 / crop.w;
+  const scaleY = 1 / crop.h;
+  const scale = Math.min(scaleX, scaleY);
 
-  useEffect(() => {
-    const el = outerRef.current;
-    if (!el) return;
-    const measure = () => {
-      const pw = el.offsetWidth;
-      const ph = el.offsetHeight;
-      if (!pw || !ph) return;
-      const cropAspect = crop.w / crop.h;
-      const parentAspect = pw / ph;
-      let w, h;
-      if (cropAspect > parentAspect) {
-        w = pw; h = pw / cropAspect;
-      } else {
-        h = ph; w = ph * cropAspect;
-      }
-      setBox({ w: Math.round(w), h: Math.round(h) });
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [crop.w, crop.h]);
-
-  const imgW = box.w / crop.w;
-  const imgH = box.h / crop.h;
-  const offsetX = -crop.x * imgW;
-  const offsetY = -crop.y * imgH;
+  // After scaling, offset so the crop region is centered
+  // The image center moves, so we need to translate to show the crop region
+  const translateX = (-crop.x - crop.w / 2 + 0.5) * 100;
+  const translateY = (-crop.y - crop.h / 2 + 0.5) * 100;
 
   return (
-    <div
-      ref={outerRef}
-      style={{
-        width: "100%", height: "100%",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        position: "relative",
-      }}
-    >
-      {box.w > 0 && (
+    <div style={{
+      width: "100%", height: "100%",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      position: "relative", overflow: "hidden",
+    }}>
+      <img
+        ref={imgRef}
+        id="stills-img"
+        src={image}
+        alt="editing"
+        onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+        style={{
+          maxWidth: "100%",
+          maxHeight: "100%",
+          objectFit: "contain",
+          display: "block",
+          filter,
+          transform: `rotate(${rotation}deg) scale(${scale}) translate(${translateX}%, ${translateY}%)`,
+          transformOrigin: "center center",
+          userSelect: "none",
+          flexShrink: 0,
+        }}
+      />
+      {vignette && (
         <div style={{
-          width: box.w, height: box.h,
-          overflow: "hidden", position: "relative", flexShrink: 0,
-        }}>
-          <img
-            ref={imgRef}
-            id="stills-img"
-            src={image}
-            alt="editing"
-            onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-            style={{
-              position: "absolute",
-              width: imgW, height: imgH,
-              left: offsetX, top: offsetY,
-              display: "block",
-              filter,
-              transform: `rotate(${rotation}deg)`,
-              userSelect: "none",
-              maxWidth: "none", maxHeight: "none",
-            }}
-          />
-          {vignette && (
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-              pointerEvents: "none", zIndex: 2,
-            }} />
-          )}
-        </div>
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+          pointerEvents: "none", zIndex: 2,
+        }} />
       )}
     </div>
   );
