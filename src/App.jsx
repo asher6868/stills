@@ -190,15 +190,16 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
 
 // CropDisplay — wrapper sized to crop region, image offset inside
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette }) {
-  const wrapRef = useRef(null);
+  const outerRef = useRef(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
-    const parent = wrapRef.current?.parentElement;
-    if (!parent) return;
+    const el = outerRef.current;
+    if (!el) return;
     const measure = () => {
-      const pw = parent.offsetWidth;
-      const ph = parent.offsetHeight;
+      const pw = el.offsetWidth;
+      const ph = el.offsetHeight;
+      if (!pw || !ph) return;
       const cropAspect = crop.w / crop.h;
       const parentAspect = pw / ph;
       let w, h;
@@ -211,11 +212,9 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     };
     measure();
     const ro = new ResizeObserver(measure);
-    ro.observe(parent);
+    ro.observe(el);
     return () => ro.disconnect();
   }, [crop.w, crop.h]);
-
-  if (!box.w) return null;
 
   const imgW = box.w / crop.w;
   const imgH = box.h / crop.h;
@@ -223,43 +222,45 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
   const offsetY = -crop.y * imgH;
 
   return (
-    <div style={{
-      width: "100%", height: "100%",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      position: "relative",
-    }}>
-      <div
-        ref={wrapRef}
-        style={{
+    <div
+      ref={outerRef}
+      style={{
+        width: "100%", height: "100%",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative",
+      }}
+    >
+      {box.w > 0 && (
+        <div style={{
           width: box.w, height: box.h,
           overflow: "hidden", position: "relative", flexShrink: 0,
-        }}
-      >
-        <img
-          ref={imgRef}
-          id="stills-img"
-          src={image}
-          alt="editing"
-          onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-          style={{
-            position: "absolute",
-            width: imgW, height: imgH,
-            left: offsetX, top: offsetY,
-            display: "block",
-            filter,
-            transform: `rotate(${rotation}deg)`,
-            userSelect: "none",
-            maxWidth: "none", maxHeight: "none",
-          }}
-        />
-        {vignette && (
-          <div style={{
-            position: "absolute", inset: 0,
-            background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-            pointerEvents: "none", zIndex: 2,
-          }} />
-        )}
-      </div>
+        }}>
+          <img
+            ref={imgRef}
+            id="stills-img"
+            src={image}
+            alt="editing"
+            onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+            style={{
+              position: "absolute",
+              width: imgW, height: imgH,
+              left: offsetX, top: offsetY,
+              display: "block",
+              filter,
+              transform: `rotate(${rotation}deg)`,
+              userSelect: "none",
+              maxWidth: "none", maxHeight: "none",
+            }}
+          />
+          {vignette && (
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+              pointerEvents: "none", zIndex: 2,
+            }} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
