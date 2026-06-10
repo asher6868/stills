@@ -188,46 +188,78 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
   );
 }
 
-// CropDisplay — shows cropped region centered at natural proportions
+// CropDisplay — wrapper sized to crop region, image offset inside
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette }) {
+  const wrapRef = useRef(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const parent = wrapRef.current?.parentElement;
+    if (!parent) return;
+    const measure = () => {
+      const pw = parent.offsetWidth;
+      const ph = parent.offsetHeight;
+      const cropAspect = crop.w / crop.h;
+      const parentAspect = pw / ph;
+      let w, h;
+      if (cropAspect > parentAspect) {
+        w = pw; h = pw / cropAspect;
+      } else {
+        h = ph; w = ph * cropAspect;
+      }
+      setBox({ w: Math.round(w), h: Math.round(h) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(parent);
+    return () => ro.disconnect();
+  }, [crop.w, crop.h]);
+
+  if (!box.w) return null;
+
+  const imgW = box.w / crop.w;
+  const imgH = box.h / crop.h;
+  const offsetX = -crop.x * imgW;
+  const offsetY = -crop.y * imgH;
+
   return (
     <div style={{
-      width: "100%",
-      height: "100%",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
+      width: "100%", height: "100%",
+      display: "flex", alignItems: "center", justifyContent: "center",
       position: "relative",
     }}>
-      <img
-        ref={imgRef}
-        id="stills-img"
-        src={image}
-        alt="editing"
-        onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+      <div
+        ref={wrapRef}
         style={{
-          // Scale image so crop region fills as much space as possible
-          maxWidth: `${100 / crop.w}%`,
-          maxHeight: `${100 / crop.h}%`,
-          width: "auto",
-          height: "auto",
-          objectFit: "contain",
-          display: "block",
-          filter,
-          transform: `rotate(${rotation}deg)`,
-          userSelect: "none",
-          // Clip to show only the crop region
-          clipPath: `inset(${crop.y * 100}% ${(1 - crop.x - crop.w) * 100}% ${(1 - crop.y - crop.h) * 100}% ${crop.x * 100}%)`,
+          width: box.w, height: box.h,
+          overflow: "hidden", position: "relative", flexShrink: 0,
         }}
-      />
-      {vignette && (
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-          pointerEvents: "none",
-          zIndex: 2,
-        }} />
-      )}
+      >
+        <img
+          ref={imgRef}
+          id="stills-img"
+          src={image}
+          alt="editing"
+          onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+          style={{
+            position: "absolute",
+            width: imgW, height: imgH,
+            left: offsetX, top: offsetY,
+            display: "block",
+            filter,
+            transform: `rotate(${rotation}deg)`,
+            userSelect: "none",
+            maxWidth: "none", maxHeight: "none",
+          }}
+        />
+        {vignette && (
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+            pointerEvents: "none", zIndex: 2,
+          }} />
+        )}
+      </div>
     </div>
   );
 }
