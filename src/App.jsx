@@ -469,7 +469,7 @@ export default function Stills() {
         filterName: FILTERS.find(f => f.id === activeFilter)?.name || activeFilter,
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         filename: imageFile?.name || "image",
-        editState: { activeFilter, brightness, contrast, saturation, grain, vignette: !!vignette, rotation, negative: !!negative, crop, cropEditing: false },
+        editState: { activeFilter, brightness, contrast, saturation, grain, vignette: !!vignette, rotation, negative: !!negative, crop, cropEditing: false, warp },
       };
 
       if (!currentEditId) {
@@ -481,7 +481,7 @@ export default function Stills() {
         setDarkroom(prev => prev.map(d => d.id === currentEditId ? { ...d, ...entry, id: currentEditId } : d));
       }
     });
-  }, [activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop]);
+  }, [activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop, warp]);
 
   // Autosave current edit state to sessionStorage too
   useEffect(() => {
@@ -597,16 +597,22 @@ export default function Stills() {
     tempCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
     tempCtx.filter = "none";
 
-    // Step 2 — crop from temp canvas into final canvas
+    // Step 2 — crop + warp into final canvas
     const preCropW = cropW;
     const preCropH = cropH;
+    const sx = currentWarpX / 100;
+    const sy = currentWarpY / 100;
     const canvas = document.createElement("canvas");
-    // Apply warp to final canvas dimensions
-    canvas.width  = Math.round(preCropW * (currentWarpX / 100));
-    canvas.height = Math.round(preCropH * (currentWarpY / 100));
+    // Final canvas is the warped size
+    canvas.width  = Math.max(1, Math.round(preCropW * sx));
+    canvas.height = Math.max(1, Math.round(preCropH * sy));
     const ctx = canvas.getContext("2d");
-    // Draw and scale to apply distort
-    ctx.drawImage(tempCanvas, cropX, cropY, preCropW, preCropH, 0, 0, canvas.width, canvas.height);
+    // Draw source crop region scaled into the warped canvas dimensions
+    ctx.drawImage(
+      tempCanvas,
+      cropX, cropY, preCropW, preCropH,
+      0, 0, canvas.width, canvas.height
+    );
 
     // Step 3 — grain
     if (grain !== "none") {
@@ -644,7 +650,7 @@ export default function Stills() {
       const thumbUrl = canvas.toDataURL("image/jpeg", 0.6);
       setDarkroom(prev => prev.map(d =>
         d.id === currentEditId
-          ? { ...d, dataUrl: thumbUrl, editState: { activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop } }
+          ? { ...d, dataUrl: thumbUrl, editState: { activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop, warp } }
           : d
       ));
       // If no currentEditId somehow, append
@@ -658,7 +664,7 @@ export default function Stills() {
           filterName: FILTERS.find(f => f.id === activeFilter)?.name || activeFilter,
           date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
           filename: imageFile?.name || "image",
-          editState: { activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop },
+          editState: { activeFilter, brightness, contrast, saturation, grain, vignette, rotation, negative, crop, warp },
         }]);
       }
     } catch(e) { console.warn("Darkroom save failed", e); }
@@ -1357,6 +1363,7 @@ export default function Stills() {
                         setRotation(s.rotation || 0);
                         setCrop(s.crop || null);
                         setCropEditing(false);
+                        setWarp(s.warp || { x: 100, y: 100 });
                         // Set negative last with a small delay to avoid being overwritten
                         const negVal = !!s.negative;
                         setTimeout(() => setNegative(negVal), 50);
