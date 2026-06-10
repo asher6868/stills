@@ -189,7 +189,7 @@ function MenuBar({ onImport, onReset, onExit, onAbout, onDarkroom }) {
 }
 
 // CropDisplay — simple, reliable crop preview
-function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize }) {
+function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette }) {
   return (
     <div style={{
       width: "100%",
@@ -198,6 +198,7 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize }) {
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
+      position: "relative",
     }}>
       <img
         ref={imgRef}
@@ -216,6 +217,14 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize }) {
           clipPath: `inset(${crop.y * 100}% ${(1 - crop.x - crop.w) * 100}% ${(1 - crop.y - crop.h) * 100}% ${crop.x * 100}%)`,
         }}
       />
+      {vignette && (
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+          pointerEvents: "none",
+          zIndex: 2,
+        }} />
+      )}
     </div>
   );
 }
@@ -1807,6 +1816,7 @@ export default function Stills() {
                     filter={compositeFilter()}
                     imgRef={imgRef}
                     setImgSize={setImgSize}
+                    vignette={vignette}
                   />
                 ) : (
                   <img
@@ -1997,11 +2007,12 @@ export default function Stills() {
                     pointerEvents: "none",
                   }} />
                 )}
-                {vignette && !crop && (
+                {vignette && (
                   <div style={{
                     position: "absolute", inset: 0,
-                    background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%)",
+                    background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
                     pointerEvents: "none",
+                    zIndex: 2,
                   }} />
                 )}
                 {/* Double-click hint */}
@@ -2010,6 +2021,7 @@ export default function Stills() {
                     position: "absolute", bottom: 8, right: 8,
                     fontSize: 8, color: "rgba(255,255,255,0.2)",
                     fontFamily: F, letterSpacing: "0.15em", pointerEvents: "none",
+                    zIndex: 3,
                   }}>double-click to enlarge</div>
                 )}
               </div>
@@ -2545,14 +2557,14 @@ export default function Stills() {
                 width: "100%",
               }}>
                 <span style={{
-                  fontFamily: F,
-                  fontSize: 10,
+                  fontFamily: "'Pinyon Script', cursive",
+                  fontSize: 22,
                   fontStyle: "normal",
                   fontWeight: 400,
-                  color: "#777",
-                  letterSpacing: "0.05em",
-                  lineHeight: 1.7,
-                  textTransform: "uppercase",
+                  color: "#aaa",
+                  letterSpacing: "0.04em",
+                  lineHeight: 1.8,
+                  textTransform: "none",
                 }}>
                   stills is made to capture a feeling<br />rather than technical perfection.
                 </span>
