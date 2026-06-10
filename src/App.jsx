@@ -1766,46 +1766,39 @@ export default function Stills() {
                   if (!crop) setLightbox(true);
                 }}
               >
-                {/* Image — crop display using aspect-ratio constrained container */}
-                {crop && !cropEditing ? (() => {
-                  const aspectW = crop.w;
-                  const aspectH = crop.h;
-                  return (
-                    <div style={{
-                      position: "relative",
-                      // Size container to crop aspect ratio, fit within canvas
-                      width: aspectW >= aspectH ? "100%" : `${(aspectW / aspectH) * 100}%`,
-                      height: aspectH >= aspectW ? "100%" : `${(aspectH / aspectW) * 100}%`,
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                      overflow: "hidden",
-                      flexShrink: 0,
-                    }}>
-                      <img
-                        ref={imgRef}
-                        id="stills-img"
-                        src={image}
-                        alt="editing"
-                        onLoad={e => setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-                        style={{
-                          position: "absolute",
-                          // Image is larger than container by inverse of crop size
-                          width: `${(1 / crop.w) * 100}%`,
-                          height: `${(1 / crop.h) * 100}%`,
-                          // Offset to show the correct crop region
-                          left: `${-(crop.x / crop.w) * 100}%`,
-                          top: `${-(crop.y / crop.h) * 100}%`,
-                          filter: compositeFilter(),
-                          transform: `rotate(${rotation}deg)`,
-                          userSelect: "none",
-                          display: "block",
-                          maxWidth: "none",
-                          maxHeight: "none",
-                        }}
-                      />
-                    </div>
-                  );
-                })()
+                {/* Image — crop display */}
+                {crop && !cropEditing ? (
+                  <div style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    // Use aspect-ratio CSS to let browser size it correctly within flex container
+                    aspectRatio: `${crop.w} / ${crop.h}`,
+                    maxWidth: "100%",
+                    maxHeight: "100%",
+                    flexShrink: 1,
+                    flexGrow: 0,
+                  }}>
+                    <img
+                      ref={imgRef}
+                      id="stills-img"
+                      src={image}
+                      alt="editing"
+                      onLoad={e => setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+                      style={{
+                        position: "absolute",
+                        width: `${(1 / crop.w) * 100}%`,
+                        height: `${(1 / crop.h) * 100}%`,
+                        left: `${-(crop.x / crop.w) * 100}%`,
+                        top: `${-(crop.y / crop.h) * 100}%`,
+                        filter: compositeFilter(),
+                        transform: `rotate(${rotation}deg)`,
+                        userSelect: "none",
+                        display: "block",
+                        maxWidth: "none",
+                        maxHeight: "none",
+                      }}
+                    />
+                  </div>
                 ) : (
                   <img
                     ref={imgRef}
