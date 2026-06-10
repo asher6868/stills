@@ -207,14 +207,17 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
         alt="editing"
         onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
         style={{
-          maxWidth: "100%",
-          maxHeight: "100%",
-          objectFit: "contain",
+          width: `${(1 / crop.w) * 100}%`,
+          height: `${(1 / crop.h) * 100}%`,
+          maxWidth: `${(1 / crop.w) * 100}%`,
+          maxHeight: `${(1 / crop.h) * 100}%`,
+          objectFit: "cover",
+          objectPosition: `${-(crop.x / crop.w) * 100}% ${-(crop.y / crop.h) * 100}%`,
           display: "block",
           filter,
           transform: `rotate(${rotation}deg)`,
           userSelect: "none",
-          clipPath: `inset(${crop.y * 100}% ${(1 - crop.x - crop.w) * 100}% ${(1 - crop.y - crop.h) * 100}% ${crop.x * 100}%)`,
+          flexShrink: 0,
         }}
       />
       {vignette && (
@@ -2558,7 +2561,7 @@ export default function Stills() {
               }}>
                 <span style={{
                   fontFamily: "'Pinyon Script', cursive",
-                  fontSize: 22,
+                  fontSize: 15,
                   fontStyle: "normal",
                   fontWeight: 400,
                   color: "#aaa",
