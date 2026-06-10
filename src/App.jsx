@@ -206,7 +206,7 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
           width: "100%",
           height: "100%",
           objectFit: "cover",
-          objectPosition: `${crop.x * 100 / (1 - crop.w) || 50}% ${crop.y * 100 / (1 - crop.h) || 50}%`,
+          objectPosition: `${crop.x * 100}% ${crop.y * 100}%`,
           display: "block",
           filter,
           transform: `rotate(${rotation}deg)`,
