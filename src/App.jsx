@@ -197,7 +197,6 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      overflow: "hidden",
       position: "relative",
     }}>
       <img
@@ -207,14 +206,15 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
         alt="editing"
         onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
         style={{
-          maxWidth: "100%",
-          maxHeight: "100%",
+          maxWidth: (rotation === 90 || rotation === 270) ? "70vh" : "100%",
+          maxHeight: (rotation === 90 || rotation === 270) ? "70vw" : "100%",
+          width: "auto",
+          height: "auto",
           objectFit: "contain",
           display: "block",
           filter,
           transform: `rotate(${rotation}deg)`,
           userSelect: "none",
-          clipPath: `inset(${crop.y * 100}% ${(1 - crop.x - crop.w) * 100}% ${(1 - crop.y - crop.h) * 100}% ${crop.x * 100}%)`,
         }}
       />
       {vignette && (
