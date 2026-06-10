@@ -198,21 +198,24 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     if (!el) return;    const pw = el.getBoundingClientRect().width;
     const ph = el.getBoundingClientRect().height;
     if (!pw || !ph) return;
-    // Account for rotation — 90/270 swaps visual width/height
+
     const isRotated = rotation === 90 || rotation === 270;
+    // When rotated 90/270, the crop's visual aspect ratio flips
     const cropAspect = isRotated ? crop.h / crop.w : crop.w / crop.h;
     const canvasAspect = pw / ph;
+
     let winW, winH;
-    // Contain — respect crop dimensions, fill as much space as possible
     if (cropAspect > canvasAspect) {
       winW = pw; winH = pw / cropAspect;
     } else {
       winH = ph; winW = ph * cropAspect;
     }
-    const fullW = winW / crop.w;
-    const fullH = winH / crop.h;
-    const offX = -crop.x * fullW;
-    const offY = -crop.y * fullH;
+
+    // For rotated images, the image offset and size also need to swap
+    const fullW = isRotated ? winH / crop.w : winW / crop.w;
+    const fullH = isRotated ? winW / crop.h : winH / crop.h;
+    const offX = isRotated ? -crop.x * fullW : -crop.x * fullW;
+    const offY = isRotated ? -crop.y * fullH : -crop.y * fullH;
     setDims({ winW, winH, fullW, fullH, offX, offY });
   }, [crop.x, crop.y, crop.w, crop.h, rotation]);
 
@@ -1874,7 +1877,6 @@ export default function Stills() {
                       alt="editing"
                       onLoad={e => setImgSize({ w: e.target.offsetWidth, h: e.target.offsetHeight })}
                       style={{
-                        // When rotated 90/270, swap width/height constraints so image fits properly
                         maxWidth: (rotation === 90 || rotation === 270) ? "100vh" : "100%",
                         maxHeight: (rotation === 90 || rotation === 270) ? "100vw" : "100%",
                         width: "auto",
