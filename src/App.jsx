@@ -295,6 +295,7 @@ export default function Stills() {
   const [glitch, setGlitch] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [negative, setNegative] = useState(false);
+  const [warp, setWarp] = useState({ x: 100, y: 100 }); // % scale on each axis
   const [crop, setCrop] = useState(null);
   const [cropEditing, setCropEditing] = useState(false); // true = grid visible, false = committed
   const [cropping, setCropping] = useState(false);
@@ -616,6 +617,7 @@ export default function Stills() {
     setNegative(false);
     setCrop(null);
     setCropEditing(false);
+    setWarp({ x: 100, y: 100 });
     triggerGlitch();
   };
 
@@ -1877,14 +1879,14 @@ export default function Stills() {
                       alt="editing"
                       onLoad={e => setImgSize({ w: e.target.offsetWidth, h: e.target.offsetHeight })}
                       style={{
-                        maxWidth: (rotation === 90 || rotation === 270) ? "100vh" : "100%",
-                        maxHeight: (rotation === 90 || rotation === 270) ? "100vw" : "100%",
+                        maxWidth: (rotation === 90 || rotation === 270) ? "60vh" : "100%",
+                        maxHeight: (rotation === 90 || rotation === 270) ? "60vw" : "100%",
                         width: "auto",
                         height: "auto",
                         objectFit: "contain",
                         display: "block",
                         filter: compositeFilter(),
-                        transform: `rotate(${rotation}deg)`,
+                        transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
                         transition: "filter 0.25s ease, transform 0.3s ease",
                         userSelect: "none",
                         flexShrink: 0,
@@ -2212,6 +2214,37 @@ export default function Stills() {
             <div style={{ fontSize: 9, color: "#555", textAlign: "center", letterSpacing: "0.1em" }}>
               {rotation}°
             </div>
+          </Panel>
+
+          {/* Distort */}
+          <Panel title="Distort">
+            {[
+              { label: "Horizontal", key: "x", val: warp.x },
+              { label: "Vertical",   key: "y", val: warp.y },
+            ].map(({ label, key, val }) => (
+              <div key={key} style={{ marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                  <span style={{ fontSize: 10, color: "#777", letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</span>
+                  <span
+                    style={{ fontSize: 10, color: "#888", cursor: "pointer" }}
+                    onDoubleClick={() => setWarp(w => ({ ...w, [key]: 100 }))}
+                    title="Double-click to reset"
+                  >{val}%</span>
+                </div>
+                <div style={{ ...sunken, padding: "3px 4px", background: "#111" }}>
+                  <input
+                    type="range" min={20} max={200} value={val}
+                    onChange={e => setWarp(w => ({ ...w, [key]: Number(e.target.value) }))}
+                    onDoubleClick={() => setWarp(w => ({ ...w, [key]: 100 }))}
+                    style={{
+                      width: "100%", height: 2, appearance: "none",
+                      background: `linear-gradient(to right, #C0392B ${((val-20)/180)*100}%, #2a2a2a ${((val-20)/180)*100}%)`,
+                      outline: "none", cursor: "pointer", display: "block",
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
           </Panel>
 
           {/* Adjustments */}
