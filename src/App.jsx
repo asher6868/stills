@@ -195,11 +195,12 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
 
   const measure = useCallback(() => {
     const el = outerRef.current;
-    if (!el) return;
-    const pw = el.getBoundingClientRect().width;
+    if (!el) return;    const pw = el.getBoundingClientRect().width;
     const ph = el.getBoundingClientRect().height;
     if (!pw || !ph) return;
-    const cropAspect = crop.w / crop.h;
+    // Account for rotation — 90/270 swaps visual width/height
+    const isRotated = rotation === 90 || rotation === 270;
+    const cropAspect = isRotated ? crop.h / crop.w : crop.w / crop.h;
     const canvasAspect = pw / ph;
     let winW, winH;
     // Contain — respect crop dimensions, fill as much space as possible
@@ -213,7 +214,7 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     const offX = -crop.x * fullW;
     const offY = -crop.y * fullH;
     setDims({ winW, winH, fullW, fullH, offX, offY });
-  }, [crop.x, crop.y, crop.w, crop.h]);
+  }, [crop.x, crop.y, crop.w, crop.h, rotation]);
 
   useEffect(() => {
     measure();
@@ -1858,25 +1859,36 @@ export default function Stills() {
                     vignette={vignette}
                   />
                 ) : (
-                  <img
-                    ref={imgRef}
-                    id="stills-img"
-                    src={image}
-                    alt="editing"
-                    onLoad={e => setImgSize({ w: e.target.offsetWidth, h: e.target.offsetHeight })}
-                    style={{
-                      maxWidth: (rotation === 90 || rotation === 270) ? "70vh" : "100%",
-                      maxHeight: (rotation === 90 || rotation === 270) ? "70vw" : "100%",
-                      width: "auto",
-                      height: "auto",
-                      objectFit: "contain",
-                      display: "block",
-                      filter: compositeFilter(),
-                      transform: `rotate(${rotation}deg)`,
-                      transition: "filter 0.25s ease, transform 0.3s ease",
-                      userSelect: "none",
-                    }}
-                  />
+                  <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%",
+                    overflow: "hidden",
+                  }}>
+                    <img
+                      ref={imgRef}
+                      id="stills-img"
+                      src={image}
+                      alt="editing"
+                      onLoad={e => setImgSize({ w: e.target.offsetWidth, h: e.target.offsetHeight })}
+                      style={{
+                        // When rotated 90/270, swap width/height constraints so image fits properly
+                        maxWidth: (rotation === 90 || rotation === 270) ? "100vh" : "100%",
+                        maxHeight: (rotation === 90 || rotation === 270) ? "100vw" : "100%",
+                        width: "auto",
+                        height: "auto",
+                        objectFit: "contain",
+                        display: "block",
+                        filter: compositeFilter(),
+                        transform: `rotate(${rotation}deg)`,
+                        transition: "filter 0.25s ease, transform 0.3s ease",
+                        userSelect: "none",
+                        flexShrink: 0,
+                      }}
+                    />
+                  </div>
                 )}
 
                 {/* Crop overlay — only shown when editing */}
