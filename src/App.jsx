@@ -11,7 +11,7 @@ const FILTERS = [
   { id: "photobooth",   name: "PHOTOBOOTH",   label: "silver strip",   css: "grayscale(1) contrast(1.35) brightness(1.05) sepia(0.12)",                                                          desc: "silver strip",   defaults: { brightness: 105, contrast: 140, saturation: 0,   grain: 18, vignette: true  } },
   { id: "grunge",       name: "GRUNGE",       label: "dark decay",     css: "grayscale(0.6) contrast(1.3) brightness(0.8) sepia(0.2) saturate(0.6)",                                             desc: "dark decay",     defaults: { brightness: 82,  contrast: 145, saturation: 55,  grain: 45, vignette: true  } },
   { id: "twilight",     name: "TWILIGHT",     label: "forest dusk",    css: "brightness(0.75) contrast(0.85) saturate(1.4) hue-rotate(150deg) sepia(0.15)",                                      desc: "forest dusk",    defaults: { brightness: 78,  contrast: 90,  saturation: 135, grain: 18, vignette: true  } },
-  { id: "karwai",       name: "KARWAI",       label: "red heat",       css: "saturate(2.2) contrast(1.2) brightness(0.75) hue-rotate(345deg) sepia(0.3)",                                        desc: "red heat",       defaults: { brightness: 78,  contrast: 128, saturation: 180, grain: 18, vignette: true  } },
+  { id: "karwai",       name: "KARWAI",       label: "red heat",       css: "saturate(0.9) contrast(1.2) brightness(0.75) hue-rotate(345deg) sepia(0.3)",                                        desc: "red heat",       defaults: { brightness: 78,  contrast: 128, saturation: 85, grain: 18, vignette: true  } },
   { id: "film",         name: "FILM",         label: "grain warmth",   css: "brightness(0.95) contrast(1.05) saturate(1.1) sepia(0.15) hue-rotate(5deg)",                                        desc: "grain warmth",   defaults: { brightness: 95,  contrast: 112, saturation: 105, grain: 45, vignette: false } },
   { id: "iwanttobeyours", name: "IWANTTOBEYOURS", label: "bruised tender", css: "brightness(1.08) contrast(0.88) saturate(0.7) sepia(0.25) hue-rotate(320deg)",                                  desc: "bruised tender", defaults: { brightness: 108, contrast: 90,  saturation: 65,  grain: 18, vignette: false } },
 ];
@@ -265,6 +265,7 @@ function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
 }
 
 // CropDisplay — shows the actual cropped region at correct proportions
+// Crop coords (x,y,w,h) are always fractions of the ORIGINAL image dimensions
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
   const outerRef = useRef(null);
   const [natural, setNatural] = useState(null);
@@ -280,31 +281,35 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     return () => ro.disconnect();
   }, []);
 
-  // Mirror RotatedImage's contain-fit calculation for the full image
-  let fullW = 0, fullH = 0;
-  if (natural && containerSize) {
-    const isRotated = rotation === 90 || rotation === 270;
-    const scaleW = isRotated ? containerSize.w / natural.h : containerSize.w / natural.w;
-    const scaleH = isRotated ? containerSize.h / natural.w : containerSize.h / natural.h;
-    const scale = Math.min(scaleW, scaleH);
-    fullW = natural.w * scale;
-    fullH = natural.h * scale;
+  // The cropped region's natural pixel dimensions
+  const cropNatW = natural ? natural.w * crop.w : 0;
+  const cropNatH = natural ? natural.h * crop.h : 0;
+
+  // Contain-fit the cropped region into the container
+  let clipW = 0, clipH = 0, scale = 0;
+  if (cropNatW > 0 && cropNatH > 0 && containerSize) {
+    const sw = containerSize.w / cropNatW;
+    const sh = containerSize.h / cropNatH;
+    scale = Math.min(sw, sh);
+    clipW = cropNatW * scale;
+    clipH = cropNatH * scale;
   }
 
-  // Crop region in px within the full contain-fitted image
-  const clipW = fullW * crop.w;
-  const clipH = fullH * crop.h;
-  const offX  = fullW * crop.x;
-  const offY  = fullH * crop.y;
+  // Full image size at the same scale
+  const fullW = natural ? natural.w * scale : 0;
+  const fullH = natural ? natural.h * scale : 0;
+
+  // Offset to show only the crop region
+  const offX = natural ? natural.w * crop.x * scale : 0;
+  const offY = natural ? natural.h * crop.y * scale : 0;
 
   return (
     <div ref={outerRef} style={{
       width: "100%", height: "100%",
       display: "flex", alignItems: "center", justifyContent: "center",
       overflow: "hidden", position: "relative",
-      background: "#141414",
     }}>
-      {/* Hidden img — fires onLoad so we get naturalWidth/Height */}
+      {/* Hidden img to get natural dimensions */}
       <img
         ref={el => {
           imgRef.current = el;
@@ -322,11 +327,9 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
         style={{ display: "none" }}
       />
 
-      {/* Clip window — only shown once we have real pixel dimensions */}
-      {fullW > 0 && clipW > 0 && clipH > 0 && (
+      {clipW > 0 && clipH > 0 && (
         <div style={{
-          width: clipW,
-          height: clipH,
+          width: clipW, height: clipH,
           overflow: "hidden",
           position: "relative",
           flexShrink: 0,
