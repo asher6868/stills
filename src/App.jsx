@@ -737,8 +737,8 @@ export default function Stills() {
           }
           @keyframes fadeInSplash {
             0%   { opacity: 0; }
-            30%  { opacity: 1; }
-            85%  { opacity: 1; }
+            15%  { opacity: 1; }
+            80%  { opacity: 1; }
             100% { opacity: 0; }
           }
           @keyframes grainMove {
@@ -845,7 +845,7 @@ export default function Stills() {
                   <div style={{
                     height: "100%",
                     background: "#C0392B",
-                    animation: "loadBar 2.8s cubic-bezier(0.4,0,0.6,1) forwards",
+                    animation: "loadBar 1.2s cubic-bezier(0.4,0,1,1) forwards",
                   }} />
                 </div>
               </foreignObject>
