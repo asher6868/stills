@@ -264,83 +264,74 @@ function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
   );
 }
 
-// CropDisplay — reliable crop preview
+// CropDisplay — shows full image with crop region highlighted
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
   const outerRef = useRef(null);
-  const [dims, setDims] = useState(null);
+  const [imgRect, setImgRect] = useState(null);
 
   const measure = useCallback(() => {
-    const el = outerRef.current;
-    if (!el) return;    const pw = el.getBoundingClientRect().width;
-    const ph = el.getBoundingClientRect().height;
-    if (!pw || !ph) return;
-
-    // Crop aspect ratio is always based on original image coordinates, not rotation
-    const cropAspect = crop.w / crop.h;
-    const canvasAspect = pw / ph;
-
-    let winW, winH;
-    if (cropAspect > canvasAspect) {
-      winW = pw; winH = pw / cropAspect;
-    } else {
-      winH = ph; winW = ph * cropAspect;
-    }
-
-    const fullW = winW / crop.w;
-    const fullH = winH / crop.h;
-    const offX = -crop.x * fullW;
-    const offY = -crop.y * fullH;
-    setDims({ winW, winH, fullW, fullH, offX, offY });
-  }, [crop.x, crop.y, crop.w, crop.h]);
+    const img = imgRef?.current;
+    const outer = outerRef.current;
+    if (!img || !outer) return;
+    const ir = img.getBoundingClientRect();
+    const or = outer.getBoundingClientRect();
+    setImgRect({ left: ir.left - or.left, top: ir.top - or.top, w: ir.width, h: ir.height });
+  }, [imgRef]);
 
   useEffect(() => {
     measure();
-    const t = setTimeout(measure, 50);
+    const t = setTimeout(measure, 60);
     const ro = new ResizeObserver(measure);
     if (outerRef.current) ro.observe(outerRef.current);
     return () => { clearTimeout(t); ro.disconnect(); };
-  }, [measure]);
+  }, [measure, crop]);
+
+  // Crop region in px over the displayed image
+  const overlay = imgRect ? {
+    left:   imgRect.left + crop.x * imgRect.w,
+    top:    imgRect.top  + crop.y * imgRect.h,
+    width:  crop.w * imgRect.w,
+    height: crop.h * imgRect.h,
+  } : null;
 
   return (
     <div ref={outerRef} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-      {dims ? (
-        <div style={{ width: dims.winW, height: dims.winH, overflow: "hidden", position: "relative", flexShrink: 0 }}>
-          <img
-            ref={imgRef}
-            id="stills-img"
-            src={image}
-            alt="editing"
-            onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
-            style={{
-              position: "absolute",
-              width: dims.fullW,
-              height: dims.fullH,
-              left: dims.offX,
-              top: dims.offY,
-              maxWidth: "none",
-              maxHeight: "none",
-              display: "block",
-              filter,
-              transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
-              userSelect: "none",
-            }}
-          />
-          {vignette && (
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-              pointerEvents: "none", zIndex: 2,
-            }} />
-          )}
-        </div>
-      ) : (
-        <img
-          ref={imgRef}
-          src={image}
-          alt="editing"
-          onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
-          style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block", filter, transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`, userSelect: "none" }}
-        />
+      {/* Full image — same as RotatedImage */}
+      <img
+        ref={imgRef}
+        id="stills-img"
+        src={image}
+        alt="editing"
+        onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
+        style={{
+          maxWidth: "100%", maxHeight: "100%",
+          objectFit: "contain", display: "block",
+          filter,
+          transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
+          userSelect: "none",
+        }}
+      />
+      {/* Dim everything outside the crop */}
+      {overlay && (
+        <>
+          {/* top */}
+          <div style={{ position: "absolute", left: 0, top: 0, right: 0, height: overlay.top, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+          {/* bottom */}
+          <div style={{ position: "absolute", left: 0, top: overlay.top + overlay.height, right: 0, bottom: 0, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+          {/* left */}
+          <div style={{ position: "absolute", left: 0, top: overlay.top, width: overlay.left, height: overlay.height, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+          {/* right */}
+          <div style={{ position: "absolute", left: overlay.left + overlay.width, top: overlay.top, right: 0, height: overlay.height, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
+          {/* crop border */}
+          <div style={{ position: "absolute", left: overlay.left, top: overlay.top, width: overlay.width, height: overlay.height, border: "1.5px solid #C0392B", pointerEvents: "none" }} />
+        </>
+      )}
+      {vignette && (
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+          pointerEvents: "none", zIndex: 2,
+        }} />
       )}
     </div>
   );
@@ -1288,13 +1279,20 @@ export default function Stills() {
           <span style={{ fontSize: 9, color: "#333", letterSpacing: "0.3em", textTransform: "uppercase" }}>
             {darkroom.length} {darkroom.length === 1 ? "negative" : "negatives"} developed
           </span>
-          {darkroom.length > 0 && (
-            <button className="dr-btn" onClick={() => setShowRefreshWarning(true)} style={{
-              background: "transparent", border: "1px solid #2a2a2a", color: "#3a3a3a",
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button className="dr-btn" onClick={() => fileInputRef.current?.click()} style={{
+              background: "transparent", border: "1px solid #2a2a2a", color: "#555",
               fontFamily: F2, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase",
               padding: "3px 10px", cursor: "pointer", transition: "all 0.15s",
-            }}>Clear All</button>
-          )}
+            }}>+ Import Image</button>
+            {darkroom.length > 0 && (
+              <button className="dr-btn" onClick={() => setShowRefreshWarning(true)} style={{
+                background: "transparent", border: "1px solid #2a2a2a", color: "#3a3a3a",
+                fontFamily: F2, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase",
+                padding: "3px 10px", cursor: "pointer", transition: "all 0.15s",
+              }}>Clear All</button>
+            )}
+          </div>
         </div>
 
         {/* Grid */}
@@ -1315,6 +1313,13 @@ export default function Stills() {
               <span style={{ fontSize: 9, color: "#333", letterSpacing: "0.2em" }}>
                 develop an image in the editor to begin
               </span>
+              <button className="dr-btn" onClick={() => fileInputRef.current?.click()} style={{
+                marginTop: 8, background: "#C0392B",
+                borderTop: "2px solid #e74c3c", borderLeft: "2px solid #e74c3c",
+                borderBottom: "2px solid #922b21", borderRight: "2px solid #922b21",
+                color: "#fff", fontFamily: F2, fontSize: 10, letterSpacing: "0.2em",
+                textTransform: "uppercase", padding: "7px 20px", cursor: "pointer", transition: "all 0.15s",
+              }}>+ Import Image</button>
               <button className="dr-btn" onClick={() => {
                 setImage(null); setImageFile(null); setCurrentEditId(null);
                 setActiveFilter("raw"); setBrightness(100); setContrast(130);
@@ -2424,6 +2429,17 @@ export default function Stills() {
             <Win3Button onClick={resetAdjustments} style={{ width: "100%", fontSize: 10 }}>
               Reset All
             </Win3Button>
+            {currentEditId && darkroom.some(d => d.id === currentEditId) && (
+              <Win3Button
+                onClick={() => {
+                  setDarkroom(prev => prev.filter(d => d.id !== currentEditId));
+                  setCurrentEditId(null);
+                }}
+                style={{ width: "100%", fontSize: 10, marginTop: 4, color: "#C0392B", borderColor: "#3a1a1a" }}
+              >
+                Delete from Darkroom
+              </Win3Button>
+            )}
           </Panel>
 
         </div>
