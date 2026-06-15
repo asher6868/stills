@@ -264,91 +264,38 @@ function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
   );
 }
 
-// CropDisplay — shows the cropped region by matching RotatedImage sizing then clipping
+// CropDisplay — simple, reliable crop preview
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
-  const outerRef = useRef(null);
-  const [natural, setNatural] = useState(null);
-  const [containerSize, setContainerSize] = useState(null);
-
-  useEffect(() => {
-    const el = outerRef.current;
-    if (!el) return;
-    const measure = () => setContainerSize({ w: el.offsetWidth, h: el.offsetHeight });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // Compute how RotatedImage would size the full image (contain fit)
-  let fullW = 0, fullH = 0;
-  if (natural && containerSize) {
-    const cw = containerSize.w;
-    const ch = containerSize.h;
-    const isRotated = rotation === 90 || rotation === 270;
-    const scaleW = isRotated ? cw / natural.h : cw / natural.w;
-    const scaleH = isRotated ? ch / natural.w : ch / natural.h;
-    const scale = Math.min(scaleW, scaleH);
-    fullW = natural.w * scale;
-    fullH = natural.h * scale;
-  }
-
-  // The cropped region in px within the full image
-  const cropPxW = fullW * crop.w;
-  const cropPxH = fullH * crop.h;
-  const cropPxX = fullW * crop.x;
-  const cropPxY = fullH * crop.y;
-
   return (
-    <div ref={outerRef} style={{
-      width: "100%", height: "100%",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      overflow: "hidden", position: "relative",
+    <div style={{
+      width: "100%",
+      height: "100%",
+      position: "relative",
     }}>
-      {fullW > 0 && (
+      <img
+        ref={imgRef}
+        id="stills-img"
+        src={image}
+        alt="editing"
+        onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+          display: "block",
+          filter,
+          transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
+          userSelect: "none",
+        }}
+      />
+      {vignette && (
         <div style={{
-          width: cropPxW, height: cropPxH,
-          overflow: "hidden",
-          position: "relative",
-          flexShrink: 0,
-        }}>
-          <img
-            id="stills-img"
-            src={image}
-            alt="editing"
-            onLoad={e => {
-              const { naturalWidth: w, naturalHeight: h } = e.target;
-              setNatural({ w, h });
-              setImgSize && setImgSize({ w, h });
-            }}
-            ref={el => {
-              imgRef.current = el;
-              if (el && el.complete && el.naturalWidth && !natural) {
-                setNatural({ w: el.naturalWidth, h: el.naturalHeight });
-              }
-            }}
-            style={{
-              width: fullW,
-              height: fullH,
-              position: "absolute",
-              left: -cropPxX,
-              top: -cropPxY,
-              maxWidth: "none",
-              maxHeight: "none",
-              display: "block",
-              filter,
-              transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
-              userSelect: "none",
-            }}
-          />
-          {vignette && (
-            <div style={{
-              position: "absolute", inset: 0,
-              background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-              pointerEvents: "none", zIndex: 2,
-            }} />
-          )}
-        </div>
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+          pointerEvents: "none",
+          zIndex: 2,
+        }} />
       )}
     </div>
   );
@@ -2038,32 +1985,13 @@ export default function Stills() {
                 {/* Crop overlay — only shown when editing */}
                 {crop && cropEditing && (() => {
                   const imgEl = document.getElementById("stills-img");
+                  const rect = imgEl?.getBoundingClientRect();
                   const containerRect = cropRef.current?.getBoundingClientRect();
-                  if (!imgEl || !containerRect) return null;
-
-                  // objectFit:contain means the image may have bars — compute actual rendered image bounds
-                  const natW = imgEl.naturalWidth || imgEl.width;
-                  const natH = imgEl.naturalHeight || imgEl.height;
-                  const contW = containerRect.width;
-                  const contH = containerRect.height;
-                  const natAspect = natW / natH;
-                  const contAspect = contW / contH;
-
-                  let imgW, imgH, imgLeft, imgTop;
-                  if (natAspect > contAspect) {
-                    // image wider than container — pillarboxed top/bottom bars
-                    imgW = contW;
-                    imgH = contW / natAspect;
-                    imgLeft = 0;
-                    imgTop = (contH - imgH) / 2;
-                  } else {
-                    // image taller than container — letterboxed left/right bars
-                    imgH = contH;
-                    imgW = contH * natAspect;
-                    imgTop = 0;
-                    imgLeft = (contW - imgW) / 2;
-                  }
-
+                  if (!rect || !containerRect) return null;
+                  const imgLeft = rect.left - containerRect.left;
+                  const imgTop = rect.top - containerRect.top;
+                  const imgW = rect.width;
+                  const imgH = rect.height;
                   const cx = imgLeft + crop.x * imgW;
                   const cy = imgTop + crop.y * imgH;
                   const cw = crop.w * imgW;
