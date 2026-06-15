@@ -2,18 +2,18 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import heic2any from "heic2any";
 
 const FILTERS = [
-  { id: "raw",          name: "RAW",          label: "no processing",  css: "",                                                                                                                    desc: "no processing",  defaults: { brightness: 100, contrast: 130, saturation: 100, grain: "none",  vignette: false } },
-  { id: "ghost",        name: "GHOST",        label: "pale overexposed", css: "brightness(1.3) saturate(0.3) contrast(0.8)",                                                                       desc: "pale overexposed", defaults: { brightness: 135, contrast: 90,  saturation: 30,  grain: "light", vignette: false } },
-  { id: "shoegaze",     name: "SHOEGAZE",     label: "pink blur",      css: "blur(0.8px) saturate(1.4) brightness(1.05) contrast(0.9) hue-rotate(330deg)",                                        desc: "pink blur",      defaults: { brightness: 108, contrast: 95,  saturation: 120, grain: "light", vignette: false } },
-  { id: "fiona",        name: "FIONA",        label: "cool cinematic", css: "sepia(0.2) contrast(1.25) saturate(0.85) brightness(0.95)",                                                          desc: "cool cinematic", defaults: { brightness: 95,  contrast: 135, saturation: 80,  grain: "light", vignette: true  } },
-  { id: "smith",        name: "SMITH",        label: "grey overcast",  css: "grayscale(0.5) sepia(0.3) contrast(1.1) brightness(0.9)",                                                            desc: "grey overcast",  defaults: { brightness: 88,  contrast: 125, saturation: 60,  grain: "light", vignette: true  } },
-  { id: "y2k",          name: "Y2K",          label: "era overdrive",  css: "saturate(2.5) contrast(1.2) brightness(1.1) hue-rotate(10deg)",                                                     desc: "era overdrive",  defaults: { brightness: 110, contrast: 130, saturation: 40,  grain: "none",  vignette: false } },
-  { id: "photobooth",   name: "PHOTOBOOTH",   label: "silver strip",   css: "grayscale(1) contrast(1.35) brightness(1.05) sepia(0.12)",                                                          desc: "silver strip",   defaults: { brightness: 105, contrast: 140, saturation: 0,   grain: "light", vignette: true  } },
-  { id: "grunge",       name: "GRUNGE",       label: "dark decay",     css: "grayscale(0.6) contrast(1.3) brightness(0.8) sepia(0.2) saturate(0.6)",                                             desc: "dark decay",     defaults: { brightness: 82,  contrast: 145, saturation: 55,  grain: "heavy", vignette: true  } },
-  { id: "twilight",     name: "TWILIGHT",     label: "forest dusk",    css: "brightness(0.75) contrast(0.85) saturate(1.4) hue-rotate(150deg) sepia(0.15)",                                      desc: "forest dusk",    defaults: { brightness: 78,  contrast: 90,  saturation: 135, grain: "light", vignette: true  } },
-  { id: "karwai",       name: "KARWAI",       label: "red heat",       css: "saturate(2.2) contrast(1.2) brightness(0.75) hue-rotate(345deg) sepia(0.3)",                                        desc: "red heat",       defaults: { brightness: 78,  contrast: 128, saturation: 180, grain: "light", vignette: true  } },
-  { id: "film",         name: "FILM",         label: "grain warmth",   css: "brightness(0.95) contrast(1.05) saturate(1.1) sepia(0.15) hue-rotate(5deg)",                                        desc: "grain warmth",   defaults: { brightness: 95,  contrast: 112, saturation: 105, grain: "heavy", vignette: false } },
-  { id: "iwanttobeyours", name: "IWANTTOBEYOURS", label: "bruised tender", css: "brightness(1.08) contrast(0.88) saturate(0.7) sepia(0.25) hue-rotate(320deg)",                                  desc: "bruised tender", defaults: { brightness: 108, contrast: 90,  saturation: 65,  grain: "light", vignette: false } },
+  { id: "raw",          name: "RAW",          label: "no processing",  css: "",                                                                                                                    desc: "no processing",  defaults: { brightness: 100, contrast: 130, saturation: 100, grain: 0,  vignette: false } },
+  { id: "ghost",        name: "GHOST",        label: "pale overexposed", css: "brightness(1.3) saturate(0.3) contrast(0.8)",                                                                       desc: "pale overexposed", defaults: { brightness: 135, contrast: 90,  saturation: 30,  grain: 18, vignette: false } },
+  { id: "shoegaze",     name: "SHOEGAZE",     label: "pink blur",      css: "blur(0.8px) saturate(1.4) brightness(1.05) contrast(0.9) hue-rotate(330deg)",                                        desc: "pink blur",      defaults: { brightness: 108, contrast: 95,  saturation: 120, grain: 18, vignette: false } },
+  { id: "fiona",        name: "FIONA",        label: "cool cinematic", css: "sepia(0.2) contrast(1.25) saturate(0.85) brightness(0.95)",                                                          desc: "cool cinematic", defaults: { brightness: 95,  contrast: 135, saturation: 80,  grain: 18, vignette: true  } },
+  { id: "smith",        name: "SMITH",        label: "grey overcast",  css: "grayscale(0.5) sepia(0.3) contrast(1.1) brightness(0.9)",                                                            desc: "grey overcast",  defaults: { brightness: 88,  contrast: 125, saturation: 60,  grain: 18, vignette: true  } },
+  { id: "y2k",          name: "Y2K",          label: "era overdrive",  css: "saturate(2.5) contrast(1.2) brightness(1.1) hue-rotate(10deg)",                                                     desc: "era overdrive",  defaults: { brightness: 110, contrast: 130, saturation: 40,  grain: 0,  vignette: false } },
+  { id: "photobooth",   name: "PHOTOBOOTH",   label: "silver strip",   css: "grayscale(1) contrast(1.35) brightness(1.05) sepia(0.12)",                                                          desc: "silver strip",   defaults: { brightness: 105, contrast: 140, saturation: 0,   grain: 18, vignette: true  } },
+  { id: "grunge",       name: "GRUNGE",       label: "dark decay",     css: "grayscale(0.6) contrast(1.3) brightness(0.8) sepia(0.2) saturate(0.6)",                                             desc: "dark decay",     defaults: { brightness: 82,  contrast: 145, saturation: 55,  grain: 45, vignette: true  } },
+  { id: "twilight",     name: "TWILIGHT",     label: "forest dusk",    css: "brightness(0.75) contrast(0.85) saturate(1.4) hue-rotate(150deg) sepia(0.15)",                                      desc: "forest dusk",    defaults: { brightness: 78,  contrast: 90,  saturation: 135, grain: 18, vignette: true  } },
+  { id: "karwai",       name: "KARWAI",       label: "red heat",       css: "saturate(2.2) contrast(1.2) brightness(0.75) hue-rotate(345deg) sepia(0.3)",                                        desc: "red heat",       defaults: { brightness: 78,  contrast: 128, saturation: 180, grain: 18, vignette: true  } },
+  { id: "film",         name: "FILM",         label: "grain warmth",   css: "brightness(0.95) contrast(1.05) saturate(1.1) sepia(0.15) hue-rotate(5deg)",                                        desc: "grain warmth",   defaults: { brightness: 95,  contrast: 112, saturation: 105, grain: 45, vignette: false } },
+  { id: "iwanttobeyours", name: "IWANTTOBEYOURS", label: "bruised tender", css: "brightness(1.08) contrast(0.88) saturate(0.7) sepia(0.25) hue-rotate(320deg)",                                  desc: "bruised tender", defaults: { brightness: 108, contrast: 90,  saturation: 65,  grain: 18, vignette: false } },
 ];
 
 const EXPORT_FORMATS = ["PNG", "JPEG", "TIFF"];
@@ -361,7 +361,7 @@ export default function Stills() {
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(130);
   const [saturation, setSaturation] = useState(100);
-  const [grain, setGrain] = useState("none");
+  const [grain, setGrain] = useState(0);
   const [vignette, setVignette] = useState(false);
   const [exportFormat, setExportFormat] = useState("PNG");
   const [exporting, setExporting] = useState(false);
@@ -498,7 +498,7 @@ export default function Stills() {
   // Auto-advance from splash to correct destination after 3.5s
   useEffect(() => {
     if (screen === "splash") {
-      const t = setTimeout(() => setScreen(splashDest), 3500);
+      const t = setTimeout(() => setScreen(splashDest), 1500);
       return () => clearTimeout(t);
     }
   }, [screen, splashDest]);
@@ -615,12 +615,11 @@ export default function Stills() {
     );
 
     // Step 3 — grain
-    if (grain !== "none") {
-      const intensity = GRAIN_INTENSITY[grain];
+    if (grain > 0) {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
       for (let i = 0; i < data.length; i += 4) {
-        const noise = (Math.random() - 0.5) * intensity * 2;
+        const noise = (Math.random() - 0.5) * grain * 2;
         data[i]     = Math.min(255, Math.max(0, data[i]     + noise));
         data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
         data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
@@ -751,7 +750,7 @@ export default function Stills() {
             100% { transform: translate(0, 0); }
           }
           .splash-wrap {
-            animation: fadeInSplash 3.5s ease forwards;
+            animation: fadeInSplash 1.5s ease forwards;
           }
           * { box-sizing: border-box; cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23111111'/%3E%3Ccircle cx='16' cy='16' r='15' fill='none' stroke='%23333' stroke-width='1'/%3E%3Ccircle cx='16' cy='16' r='7' fill='white'/%3E%3Ccircle cx='13' cy='13' r='4' fill='white'/%3E%3Ctext x='16' y='20' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='9' fill='%23111'>8%3C/text%3E%3Ccircle cx='10' cy='7' r='3' fill='%23555' opacity='0.4'/%3E%3C/svg%3E") 16 16, auto !important; }
           html, body, #root { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
@@ -1220,7 +1219,7 @@ export default function Stills() {
               setBrightness(100);
               setContrast(130);
               setSaturation(100);
-              setGrain("none");
+              setGrain(0);
               setVignette(false);
               setRotation(0);
               setNegative(false);
@@ -1319,7 +1318,7 @@ export default function Stills() {
               <button className="dr-btn" onClick={() => {
                 setImage(null); setImageFile(null); setCurrentEditId(null);
                 setActiveFilter("raw"); setBrightness(100); setContrast(130);
-                setSaturation(100); setGrain("none"); setVignette(false);
+                setSaturation(100); setGrain(0); setVignette(false);
                 setRotation(0); setNegative(false); setCrop(null);
                 setScreen("splash");
                 setSplashDest("editor"); setScreen("splash");
@@ -1358,7 +1357,7 @@ export default function Stills() {
                         setBrightness(s.brightness ?? 100);
                         setContrast(s.contrast ?? 130);
                         setSaturation(s.saturation ?? 100);
-                        setGrain(s.grain || "none");
+                        setGrain(typeof s.grain === "number" ? s.grain : 0);
                         setVignette(!!s.vignette);
                         setRotation(s.rotation || 0);
                         setCrop(s.crop || null);
@@ -2122,11 +2121,11 @@ export default function Stills() {
                   </div>
                 )}
 
-                {grain !== "none" && (
+                {grain > 0 && (
                   <div style={{
                     position: "absolute", inset: 0,
                     backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
-                    opacity: grain === "light" ? 0.08 : 0.22,
+                    opacity: grain / 100 * 0.5,
                     mixBlendMode: "overlay",
                     pointerEvents: "none",
                   }} />
@@ -2350,12 +2349,20 @@ export default function Stills() {
 
           {/* Film Grain */}
           <Panel title="Film Grain">
-            <div style={{ display: "flex", gap: 4 }}>
-              {Object.keys(GRAIN_INTENSITY).map(g => (
-                <Win3Button key={g} active={grain === g} onClick={() => setGrain(g)} style={{ flex: 1, fontSize: 10 }}>
-                  {g}
-                </Win3Button>
-              ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={grain}
+                onChange={e => setGrain(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#C0392B", cursor: "pointer" }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                <span>None</span>
+                <span>{grain}</span>
+                <span>Heavy</span>
+              </div>
             </div>
           </Panel>
 
