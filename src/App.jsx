@@ -2349,18 +2349,25 @@ export default function Stills() {
 
           {/* Film Grain */}
           <Panel title="Film Grain">
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={grain}
-                onChange={e => setGrain(Number(e.target.value))}
-                style={{ width: "100%", accentColor: "#C0392B", cursor: "pointer" }}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#888", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 10, color: "#777", letterSpacing: "0.05em", textTransform: "uppercase" }}>Grain</span>
+                <span style={{ fontSize: 10, color: "#888" }}>{grain}</span>
+              </div>
+              <div style={{ ...sunken, padding: "3px 4px", background: "#111" }}>
+                <input
+                  type="range" min={0} max={100} value={grain}
+                  onChange={e => setGrain(Number(e.target.value))}
+                  onDoubleClick={() => setGrain(0)}
+                  style={{
+                    width: "100%", height: 2, appearance: "none",
+                    background: `linear-gradient(to right, #C0392B ${grain}%, #2a2a2a ${grain}%)`,
+                    outline: "none", cursor: "pointer", display: "block",
+                  }}
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: "#555", letterSpacing: "0.1em", textTransform: "uppercase" }}>
                 <span>None</span>
-                <span>{grain}</span>
                 <span>Heavy</span>
               </div>
             </div>
