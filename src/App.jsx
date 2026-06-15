@@ -1985,13 +1985,32 @@ export default function Stills() {
                 {/* Crop overlay — only shown when editing */}
                 {crop && cropEditing && (() => {
                   const imgEl = document.getElementById("stills-img");
-                  const rect = imgEl?.getBoundingClientRect();
                   const containerRect = cropRef.current?.getBoundingClientRect();
-                  if (!rect || !containerRect) return null;
-                  const imgLeft = rect.left - containerRect.left;
-                  const imgTop = rect.top - containerRect.top;
-                  const imgW = rect.width;
-                  const imgH = rect.height;
+                  if (!imgEl || !containerRect) return null;
+
+                  // objectFit:contain means the image may have bars — compute actual rendered image bounds
+                  const natW = imgEl.naturalWidth || imgEl.width;
+                  const natH = imgEl.naturalHeight || imgEl.height;
+                  const contW = containerRect.width;
+                  const contH = containerRect.height;
+                  const natAspect = natW / natH;
+                  const contAspect = contW / contH;
+
+                  let imgW, imgH, imgLeft, imgTop;
+                  if (natAspect > contAspect) {
+                    // image wider than container — pillarboxed top/bottom bars
+                    imgW = contW;
+                    imgH = contW / natAspect;
+                    imgLeft = 0;
+                    imgTop = (contH - imgH) / 2;
+                  } else {
+                    // image taller than container — letterboxed left/right bars
+                    imgH = contH;
+                    imgW = contH * natAspect;
+                    imgTop = 0;
+                    imgLeft = (contW - imgW) / 2;
+                  }
+
                   const cx = imgLeft + crop.x * imgW;
                   const cy = imgTop + crop.y * imgH;
                   const cw = crop.w * imgW;
