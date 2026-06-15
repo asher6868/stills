@@ -398,14 +398,19 @@ export default function Stills() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [splashDest, setSplashDest] = useState("landing");
   const [imgSize, setImgSize] = useState(null);
-  const [mobilePanel, setMobilePanel] = useState("filters"); // "filters" | "tools"
+  const [mobilePanel, setMobilePanel] = useState("filters");
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 700);
+  const [isLandscape, setIsLandscape] = useState(() => window.innerWidth > window.innerHeight);
+  const [canvasZoom, setCanvasZoom] = useState(1);
   const fileInputRef = useRef(null);
   const cropRef = useRef(null);
   const imgRef = useRef(null);
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 700);
+    const onResize = () => {
+      setIsMobile(window.innerWidth < 700);
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
     window.addEventListener("resize", onResize);
     // Ensure viewport meta is set for mobile
     if (!document.querySelector('meta[name="viewport"]')) {
@@ -1807,14 +1812,20 @@ export default function Stills() {
       </div>
 
       {/* Main layout */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", gap: isMobile ? 0 : 4, padding: isMobile ? 0 : 4, flexDirection: isMobile ? "column" : "row" }}>
+      <div style={{
+        display: "flex", flex: 1, overflow: "hidden",
+        gap: isMobile ? 0 : 4,
+        padding: isMobile ? 0 : 4,
+        flexDirection: isMobile && !isLandscape ? "column" : "row",
+      }}>
 
-        {/* Mobile tab bar */}
-        {isMobile && (
-          <div style={{ display: "flex", background: "#111", borderBottom: "1px solid #1a1a1a", flexShrink: 0 }}>
+        {/* Mobile portrait: tab bar to switch between Filters / Tools */}
+        {isMobile && !isLandscape && (
+          <div style={{ display: "flex", background: "#111", borderBottom: "1px solid #1a1a1a", flexShrink: 0, order: 2 }}>
             {["filters", "tools"].map(tab => (
               <button key={tab} onClick={() => setMobilePanel(tab)} style={{
-                flex: 1, padding: "10px 0", background: mobilePanel === tab ? "#1a1a1a" : "transparent",
+                flex: 1, padding: "10px 0",
+                background: mobilePanel === tab ? "#1a1a1a" : "transparent",
                 border: "none", borderBottom: mobilePanel === tab ? "2px solid #C0392B" : "2px solid transparent",
                 color: mobilePanel === tab ? "#e8e0d4" : "#555",
                 fontFamily: F, fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer",
@@ -1824,9 +1835,18 @@ export default function Stills() {
         )}
 
         {/* Left panel — Filters */}
-        <div style={{ width: isMobile ? "100%" : 172, flexShrink: 0, display: isMobile ? (mobilePanel === "filters" ? "flex" : "none") : "flex", flexDirection: "column", minHeight: 0, maxHeight: isMobile ? 200 : undefined }}>
+        <div style={{
+          width: isMobile ? (isLandscape ? 110 : "100%") : 172,
+          flexShrink: 0,
+          display: isMobile && !isLandscape ? (mobilePanel === "filters" ? "flex" : "none") : "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          maxHeight: isMobile && !isLandscape ? 220 : undefined,
+          order: isMobile && !isLandscape ? 3 : undefined,
+          overflowY: isMobile && isLandscape ? "auto" : undefined,
+        }}>
           <Panel title={isMobile ? null : "Filters"} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
-            <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: isMobile ? "row" : "column", flexWrap: isMobile ? "wrap" : "nowrap", gap: 2, minHeight: 0, padding: isMobile ? 4 : 0 }}>
+            <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: isMobile && !isLandscape ? "row" : "column", flexWrap: isMobile && !isLandscape ? "wrap" : "nowrap", gap: 2, minHeight: 0, padding: isMobile ? 4 : 0 }}>
               {FILTERS.map((f) => {
                 const isActive = activeFilter === f.id;
                 return (
@@ -1884,7 +1904,13 @@ export default function Stills() {
         </div>
 
         {/* Center — Canvas */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: isMobile ? 0 : undefined, order: isMobile ? -1 : undefined }}>
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column", minWidth: 0,
+          order: isMobile && !isLandscape ? 1 : undefined,
+          minHeight: isMobile && !isLandscape ? 220 : 0,
+          maxHeight: isMobile && !isLandscape ? "45vh" : undefined,
+          overflowX: isMobile && isLandscape ? "auto" : undefined,
+        }}>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -2017,10 +2043,35 @@ export default function Stills() {
                   justifyContent: "center",
                   width: "100%",
                   height: "100%",
+                  transform: isMobile && isLandscape ? `scale(${canvasZoom})` : undefined,
+                  transformOrigin: "center center",
+                  transition: "transform 0.1s ease",
                 }}
                 onDoubleClick={(e) => {
-                  // only open lightbox if not in crop mode
+                  if (isMobile && isLandscape) {
+                    setCanvasZoom(z => z > 1.1 ? 1 : 2);
+                    return;
+                  }
                   if (!crop) setLightbox(true);
+                }}
+                onTouchStart={e => {
+                  if (!isMobile || !isLandscape) return;
+                  if (e.touches.length === 2) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    e.currentTarget._pinchStart = Math.hypot(dx, dy);
+                    e.currentTarget._zoomStart = canvasZoom;
+                  }
+                }}
+                onTouchMove={e => {
+                  if (!isMobile || !isLandscape) return;
+                  if (e.touches.length === 2 && e.currentTarget._pinchStart) {
+                    const dx = e.touches[0].clientX - e.touches[1].clientX;
+                    const dy = e.touches[0].clientY - e.touches[1].clientY;
+                    const dist = Math.hypot(dx, dy);
+                    const newZoom = Math.min(4, Math.max(0.5, e.currentTarget._zoomStart * (dist / e.currentTarget._pinchStart)));
+                    setCanvasZoom(newZoom);
+                  }
                 }}
               >
                 {/* Image — crop display */}
@@ -2221,14 +2272,31 @@ export default function Stills() {
                     zIndex: 2,
                   }} />
                 )}
-                {/* Double-click hint */}
-                {!crop && (
+                {/* Hint */}
+                {!crop && isMobile && isLandscape && (
+                  <div style={{
+                    position: "absolute", bottom: 8, right: 8,
+                    fontSize: 8, color: "rgba(255,255,255,0.25)",
+                    fontFamily: F, letterSpacing: "0.15em", pointerEvents: "none",
+                    zIndex: 3,
+                  }}>pinch to zoom · double-tap to reset</div>
+                )}
+                {!crop && !isMobile && (
                   <div style={{
                     position: "absolute", bottom: 8, right: 8,
                     fontSize: 8, color: "rgba(255,255,255,0.2)",
                     fontFamily: F, letterSpacing: "0.15em", pointerEvents: "none",
                     zIndex: 3,
                   }}>double-click to enlarge</div>
+                )}
+                {isMobile && isLandscape && canvasZoom !== 1 && (
+                  <button onClick={() => setCanvasZoom(1)} style={{
+                    position: "absolute", top: 8, right: 8,
+                    background: "rgba(0,0,0,0.6)", border: "1px solid #333",
+                    color: "#888", fontSize: 9, fontFamily: F,
+                    letterSpacing: "0.12em", textTransform: "uppercase",
+                    padding: "4px 8px", cursor: "pointer", zIndex: 10,
+                  }}>Reset Zoom</button>
                 )}
               </div>
             )}
@@ -2286,7 +2354,17 @@ export default function Stills() {
         </div>
 
         {/* Right panel */}
-        <div style={{ width: isMobile ? "100%" : 210, flexShrink: 0, display: isMobile ? (mobilePanel === "tools" ? "flex" : "none") : "flex", flexDirection: "column", gap: 4, overflowY: "auto", overflowX: "hidden", maxHeight: isMobile ? 260 : undefined }}>
+        <div style={{
+          width: isMobile ? (isLandscape ? 190 : "100%") : 210,
+          flexShrink: 0,
+          display: isMobile && !isLandscape ? (mobilePanel === "tools" ? "flex" : "none") : "flex",
+          flexDirection: "column",
+          gap: 4,
+          overflowY: "auto",
+          overflowX: "hidden",
+          maxHeight: isMobile && !isLandscape ? 260 : undefined,
+          order: isMobile && !isLandscape ? 3 : undefined,
+        }}>
 
           {/* Crop — first, malleable */}
           <Panel title="Crop">
