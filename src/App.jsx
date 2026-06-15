@@ -264,66 +264,42 @@ function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
   );
 }
 
-// CropDisplay — zooms into the crop region as preview
+// CropDisplay — simple, reliable crop preview
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
-  const outerRef = useRef(null);
-  const [dims, setDims] = useState(null);
-
-  const measure = useCallback(() => {
-    const el = outerRef.current;
-    if (!el) return;
-    const pw = el.getBoundingClientRect().width;
-    const ph = el.getBoundingClientRect().height;
-    if (!pw || !ph) return;
-    const cropAspect = crop.w / crop.h;
-    const canvasAspect = pw / ph;
-    let winW, winH;
-    if (cropAspect > canvasAspect) {
-      winW = pw; winH = pw / cropAspect;
-    } else {
-      winH = ph; winW = ph * cropAspect;
-    }
-    const fullW = winW / crop.w;
-    const fullH = winH / crop.h;
-    const offX = -crop.x * fullW;
-    const offY = -crop.y * fullH;
-    setDims({ winW, winH, fullW, fullH, offX, offY });
-  }, [crop.x, crop.y, crop.w, crop.h]);
-
-  useEffect(() => {
-    measure();
-    const t = setTimeout(measure, 50);
-    const ro = new ResizeObserver(measure);
-    if (outerRef.current) ro.observe(outerRef.current);
-    return () => { clearTimeout(t); ro.disconnect(); };
-  }, [measure]);
-
   return (
-    <div ref={outerRef} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-      {dims && (
-        <div style={{ width: dims.winW, height: dims.winH, overflow: "hidden", position: "relative", flexShrink: 0 }}>
-          <img
-            ref={imgRef}
-            id="stills-img"
-            src={image}
-            alt="editing"
-            onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
-            style={{
-              position: "absolute",
-              width: dims.fullW, height: dims.fullH,
-              left: dims.offX, top: dims.offY,
-              maxWidth: "none", maxHeight: "none",
-              display: "block", filter,
-              transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
-              userSelect: "none",
-            }}
-          />
-          {vignette && (
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)", pointerEvents: "none", zIndex: 2 }} />
-          )}
-        </div>
+    <div style={{
+      width: "100%",
+      height: "100%",
+      position: "relative",
+    }}>
+      <img
+        ref={imgRef}
+        id="stills-img"
+        src={image}
+        alt="editing"
+        onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          objectPosition: "center",
+          display: "block",
+          filter,
+          transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
+          userSelect: "none",
+        }}
+      />
+      {vignette && (
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+          pointerEvents: "none",
+          zIndex: 2,
+        }} />
       )}
     </div>
+  );
+}
   );
 }
 
@@ -506,7 +482,7 @@ export default function Stills() {
     setTimeout(() => setGlitch(false), 350);
   };
 
-  const handleFile = async (file) => {
+  const handleFile = async (file, navigateAfter = false) => {
     if (!file) return;
     const isHeic = file.type === "image/heic" || file.type === "image/heif" ||
       file.name.toLowerCase().endsWith(".heic") ||
@@ -539,9 +515,11 @@ export default function Stills() {
       setImage(dataUrl);
       setCrop(null);
       triggerGlitch();
-      // Store converted dataUrl in imageFile ref so darkroom restore works
-      // We attach it as a property for later retrieval
       file._convertedDataUrl = dataUrl;
+      if (navigateAfter) {
+        setSplashDest("editor");
+        setScreen("splash");
+      }
     };
     reader.readAsDataURL(processedFile);
   };
@@ -1627,10 +1605,7 @@ export default function Stills() {
         onChange={(e) => {
           const file = e.target.files[0];
           if (!file) return;
-          handleFile(file);
-          // Navigate to editor after picking
-          setSplashDest("editor");
-          setScreen("splash");
+          handleFile(file, true);
           e.target.value = "";
         }}
       />
