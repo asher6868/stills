@@ -264,38 +264,99 @@ function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
   );
 }
 
-// CropDisplay — simple, reliable crop preview
+// CropDisplay — shows the actual cropped region at correct proportions
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
+  const outerRef = useRef(null);
+  const [natural, setNatural] = useState(null);
+  const [containerSize, setContainerSize] = useState(null);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const measure = () => setContainerSize({ w: el.offsetWidth, h: el.offsetHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Mirror RotatedImage's contain-fit calculation for the full image
+  let fullW = 0, fullH = 0;
+  if (natural && containerSize) {
+    const isRotated = rotation === 90 || rotation === 270;
+    const scaleW = isRotated ? containerSize.w / natural.h : containerSize.w / natural.w;
+    const scaleH = isRotated ? containerSize.h / natural.w : containerSize.h / natural.h;
+    const scale = Math.min(scaleW, scaleH);
+    fullW = natural.w * scale;
+    fullH = natural.h * scale;
+  }
+
+  // Crop region in px within the full contain-fitted image
+  const clipW = fullW * crop.w;
+  const clipH = fullH * crop.h;
+  const offX  = fullW * crop.x;
+  const offY  = fullH * crop.y;
+
   return (
-    <div style={{
-      width: "100%",
-      height: "100%",
-      position: "relative",
+    <div ref={outerRef} style={{
+      width: "100%", height: "100%",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      overflow: "hidden", position: "relative",
+      background: "#141414",
     }}>
+      {/* Hidden img — fires onLoad so we get naturalWidth/Height */}
       <img
-        ref={imgRef}
-        id="stills-img"
-        src={image}
-        alt="editing"
-        onLoad={e => setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          objectPosition: "center",
-          display: "block",
-          filter,
-          transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
-          userSelect: "none",
+        ref={el => {
+          imgRef.current = el;
+          if (el && el.complete && el.naturalWidth && !natural) {
+            setNatural({ w: el.naturalWidth, h: el.naturalHeight });
+            setImgSize && setImgSize({ w: el.naturalWidth, h: el.naturalHeight });
+          }
         }}
+        src={image}
+        alt=""
+        onLoad={e => {
+          setNatural({ w: e.target.naturalWidth, h: e.target.naturalHeight });
+          setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight });
+        }}
+        style={{ display: "none" }}
       />
-      {vignette && (
+
+      {/* Clip window — only shown once we have real pixel dimensions */}
+      {fullW > 0 && clipW > 0 && clipH > 0 && (
         <div style={{
-          position: "absolute", inset: 0,
-          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-          pointerEvents: "none",
-          zIndex: 2,
-        }} />
+          width: clipW,
+          height: clipH,
+          overflow: "hidden",
+          position: "relative",
+          flexShrink: 0,
+        }}>
+          <img
+            id="stills-img"
+            src={image}
+            alt="editing"
+            style={{
+              position: "absolute",
+              width: fullW,
+              height: fullH,
+              left: -offX,
+              top: -offY,
+              maxWidth: "none",
+              maxHeight: "none",
+              display: "block",
+              filter,
+              transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
+              userSelect: "none",
+            }}
+          />
+          {vignette && (
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
+              pointerEvents: "none", zIndex: 2,
+            }} />
+          )}
+        </div>
       )}
     </div>
   );
