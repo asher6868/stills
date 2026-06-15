@@ -300,8 +300,6 @@ function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignet
     </div>
   );
 }
-  );
-}
 
 export default function Stills() {
   const [screen, setScreen] = useState("splash");
@@ -1139,6 +1137,19 @@ export default function Stills() {
         fontFamily: F2,
         overflow: "hidden",
       }}>
+        {/* File input mounted here so Import works from darkroom */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.heic,.heif"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            handleFile(file, true);
+            e.target.value = "";
+          }}
+        />
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=IBM+Plex+Sans:wght@300;400;500;700&display=swap');
           @keyframes neonBlink {
@@ -1321,7 +1332,7 @@ export default function Stills() {
           ) : (
             <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
               gap: 14,
             }}>
               {darkroom.map((item, idx) => {
