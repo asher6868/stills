@@ -264,74 +264,64 @@ function RotatedImage({ imgRef, image, rotation, filter, setImgSize, warp }) {
   );
 }
 
-// CropDisplay — shows full image with crop region highlighted
+// CropDisplay — zooms into the crop region as preview
 function CropDisplay({ image, crop, rotation, filter, imgRef, setImgSize, vignette, warp = { x: 100, y: 100 } }) {
   const outerRef = useRef(null);
-  const [imgRect, setImgRect] = useState(null);
+  const [dims, setDims] = useState(null);
 
   const measure = useCallback(() => {
-    const img = imgRef?.current;
-    const outer = outerRef.current;
-    if (!img || !outer) return;
-    const ir = img.getBoundingClientRect();
-    const or = outer.getBoundingClientRect();
-    setImgRect({ left: ir.left - or.left, top: ir.top - or.top, w: ir.width, h: ir.height });
-  }, [imgRef]);
+    const el = outerRef.current;
+    if (!el) return;
+    const pw = el.getBoundingClientRect().width;
+    const ph = el.getBoundingClientRect().height;
+    if (!pw || !ph) return;
+    const cropAspect = crop.w / crop.h;
+    const canvasAspect = pw / ph;
+    let winW, winH;
+    if (cropAspect > canvasAspect) {
+      winW = pw; winH = pw / cropAspect;
+    } else {
+      winH = ph; winW = ph * cropAspect;
+    }
+    const fullW = winW / crop.w;
+    const fullH = winH / crop.h;
+    const offX = -crop.x * fullW;
+    const offY = -crop.y * fullH;
+    setDims({ winW, winH, fullW, fullH, offX, offY });
+  }, [crop.x, crop.y, crop.w, crop.h]);
 
   useEffect(() => {
     measure();
-    const t = setTimeout(measure, 60);
+    const t = setTimeout(measure, 50);
     const ro = new ResizeObserver(measure);
     if (outerRef.current) ro.observe(outerRef.current);
     return () => { clearTimeout(t); ro.disconnect(); };
-  }, [measure, crop]);
-
-  // Crop region in px over the displayed image
-  const overlay = imgRect ? {
-    left:   imgRect.left + crop.x * imgRect.w,
-    top:    imgRect.top  + crop.y * imgRect.h,
-    width:  crop.w * imgRect.w,
-    height: crop.h * imgRect.h,
-  } : null;
+  }, [measure]);
 
   return (
     <div ref={outerRef} style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-      {/* Full image — same as RotatedImage */}
-      <img
-        ref={imgRef}
-        id="stills-img"
-        src={image}
-        alt="editing"
-        onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
-        style={{
-          maxWidth: "100%", maxHeight: "100%",
-          objectFit: "contain", display: "block",
-          filter,
-          transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
-          userSelect: "none",
-        }}
-      />
-      {/* Dim everything outside the crop */}
-      {overlay && (
-        <>
-          {/* top */}
-          <div style={{ position: "absolute", left: 0, top: 0, right: 0, height: overlay.top, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-          {/* bottom */}
-          <div style={{ position: "absolute", left: 0, top: overlay.top + overlay.height, right: 0, bottom: 0, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-          {/* left */}
-          <div style={{ position: "absolute", left: 0, top: overlay.top, width: overlay.left, height: overlay.height, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-          {/* right */}
-          <div style={{ position: "absolute", left: overlay.left + overlay.width, top: overlay.top, right: 0, height: overlay.height, background: "rgba(0,0,0,0.55)", pointerEvents: "none" }} />
-          {/* crop border */}
-          <div style={{ position: "absolute", left: overlay.left, top: overlay.top, width: overlay.width, height: overlay.height, border: "1.5px solid #C0392B", pointerEvents: "none" }} />
-        </>
-      )}
-      {vignette && (
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
-          pointerEvents: "none", zIndex: 2,
-        }} />
+      {dims && (
+        <div style={{ width: dims.winW, height: dims.winH, overflow: "hidden", position: "relative", flexShrink: 0 }}>
+          <img
+            ref={imgRef}
+            id="stills-img"
+            src={image}
+            alt="editing"
+            onLoad={e => { setImgSize && setImgSize({ w: e.target.naturalWidth, h: e.target.naturalHeight }); measure(); }}
+            style={{
+              position: "absolute",
+              width: dims.fullW, height: dims.fullH,
+              left: dims.offX, top: dims.offY,
+              maxWidth: "none", maxHeight: "none",
+              display: "block", filter,
+              transform: `rotate(${rotation}deg) scaleX(${warp.x / 100}) scaleY(${warp.y / 100})`,
+              userSelect: "none",
+            }}
+          />
+          {vignette && (
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)", pointerEvents: "none", zIndex: 2 }} />
+          )}
+        </div>
       )}
     </div>
   );
@@ -360,19 +350,34 @@ export default function Stills() {
   const [glitch, setGlitch] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [negative, setNegative] = useState(false);
-  const [warp, setWarp] = useState({ x: 100, y: 100 }); // % scale on each axis
+  const [warp, setWarp] = useState({ x: 100, y: 100 });
   const [crop, setCrop] = useState(null);
-  const [cropEditing, setCropEditing] = useState(false); // true = grid visible, false = committed
+  const [cropEditing, setCropEditing] = useState(false);
   const [cropping, setCropping] = useState(false);
   const [cropStart, setCropStart] = useState(null);
   const [lightbox, setLightbox] = useState(false);
   const [showRefreshWarning, setShowRefreshWarning] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [splashDest, setSplashDest] = useState("landing");
-  const [imgSize, setImgSize] = useState(null); // {w, h} rendered px size
+  const [imgSize, setImgSize] = useState(null);
+  const [mobilePanel, setMobilePanel] = useState("filters"); // "filters" | "tools"
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 700);
   const fileInputRef = useRef(null);
   const cropRef = useRef(null);
   const imgRef = useRef(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 700);
+    window.addEventListener("resize", onResize);
+    // Ensure viewport meta is set for mobile
+    if (!document.querySelector('meta[name="viewport"]')) {
+      const m = document.createElement("meta");
+      m.name = "viewport";
+      m.content = "width=device-width, initial-scale=1, maximum-scale=1";
+      document.head.appendChild(m);
+    }
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Intercept browser refresh/close to show custom warning
   useEffect(() => {
@@ -1338,7 +1343,7 @@ export default function Stills() {
           ) : (
             <div style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
               gap: 14,
             }}>
               {darkroom.map((item, idx) => {
@@ -1613,6 +1618,23 @@ export default function Stills() {
       overflow: "hidden",
     }}>
 
+      {/* Always-mounted file input so it works from any screen */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.heic,.heif"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          handleFile(file);
+          // Navigate to editor after picking
+          setSplashDest("editor");
+          setScreen("splash");
+          e.target.value = "";
+        }}
+      />
+
       {/* App title bar */}
       <div style={{
         ...raised,
@@ -1734,21 +1756,27 @@ export default function Stills() {
         </div>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,.heic,.heif"
-        style={{ display: "none" }}
-        onChange={(e) => handleFile(e.target.files[0])}
-      />
-
       {/* Main layout */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden", gap: 4, padding: 4 }}>
+      <div style={{ display: "flex", flex: 1, overflow: "hidden", gap: isMobile ? 0 : 4, padding: isMobile ? 0 : 4, flexDirection: isMobile ? "column" : "row" }}>
+
+        {/* Mobile tab bar */}
+        {isMobile && (
+          <div style={{ display: "flex", background: "#111", borderBottom: "1px solid #1a1a1a", flexShrink: 0 }}>
+            {["filters", "tools"].map(tab => (
+              <button key={tab} onClick={() => setMobilePanel(tab)} style={{
+                flex: 1, padding: "10px 0", background: mobilePanel === tab ? "#1a1a1a" : "transparent",
+                border: "none", borderBottom: mobilePanel === tab ? "2px solid #C0392B" : "2px solid transparent",
+                color: mobilePanel === tab ? "#e8e0d4" : "#555",
+                fontFamily: F, fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer",
+              }}>{tab === "filters" ? "Filters" : "Tools"}</button>
+            ))}
+          </div>
+        )}
 
         {/* Left panel — Filters */}
-        <div style={{ width: 172, flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <Panel title="Filters" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
-            <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 2, minHeight: 0 }}>
+        <div style={{ width: isMobile ? "100%" : 172, flexShrink: 0, display: isMobile ? (mobilePanel === "filters" ? "flex" : "none") : "flex", flexDirection: "column", minHeight: 0, maxHeight: isMobile ? 200 : undefined }}>
+          <Panel title={isMobile ? null : "Filters"} style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 }}>
+            <div style={{ overflowY: "auto", flex: 1, display: "flex", flexDirection: isMobile ? "row" : "column", flexWrap: isMobile ? "wrap" : "nowrap", gap: 2, minHeight: 0, padding: isMobile ? 4 : 0 }}>
               {FILTERS.map((f) => {
                 const isActive = activeFilter === f.id;
                 return (
@@ -1806,7 +1834,7 @@ export default function Stills() {
         </div>
 
         {/* Center — Canvas */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: isMobile ? 0 : undefined, order: isMobile ? -1 : undefined }}>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -2208,7 +2236,7 @@ export default function Stills() {
         </div>
 
         {/* Right panel */}
-        <div style={{ width: 210, flexShrink: 0, display: "flex", flexDirection: "column", gap: 4, overflowY: "auto", overflowX: "hidden" }}>
+        <div style={{ width: isMobile ? "100%" : 210, flexShrink: 0, display: isMobile ? (mobilePanel === "tools" ? "flex" : "none") : "flex", flexDirection: "column", gap: 4, overflowY: "auto", overflowX: "hidden", maxHeight: isMobile ? 260 : undefined }}>
 
           {/* Crop — first, malleable */}
           <Panel title="Crop">
@@ -2426,7 +2454,7 @@ export default function Stills() {
             >
               {exporting ? "Saving..." : "Save Image"}
             </Win3Button>
-            <Win3Button onClick={resetAdjustments} style={{ width: "100%", fontSize: 10 }}>
+            <Win3Button onClick={resetAdjustments} style={{ width: "100%", fontSize: 10, marginBottom: 4 }}>
               Reset All
             </Win3Button>
             {currentEditId && darkroom.some(d => d.id === currentEditId) && (
@@ -2435,9 +2463,9 @@ export default function Stills() {
                   setDarkroom(prev => prev.filter(d => d.id !== currentEditId));
                   setCurrentEditId(null);
                 }}
-                style={{ width: "100%", fontSize: 10, marginTop: 4, color: "#C0392B", borderColor: "#3a1a1a" }}
+                style={{ width: "100%", fontSize: 10, color: "#C0392B", borderColor: "#3a1a1a" }}
               >
-                Delete from Darkroom
+                ✕ Delete Negative
               </Win3Button>
             )}
           </Panel>
