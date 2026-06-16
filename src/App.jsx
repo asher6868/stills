@@ -629,56 +629,114 @@ export default function Stills() {
     return [base, manual, inv].filter(Boolean).join(" ");
   };
 
+  // Convert a CSS filter string to SVG filter primitives for Safari canvas fallback
+  const cssFilterToSvg = (filterStr) => {
+    const parts = [];
+    const brightness = filterStr.match(/brightness\(([\d.]+)\)/)?.[1];
+    const contrast   = filterStr.match(/contrast\(([\d.]+)\)/)?.[1];
+    const saturate   = filterStr.match(/saturate\(([\d.]+)\)/)?.[1];
+    const sepia      = filterStr.match(/sepia\(([\d.]+)\)/)?.[1];
+    const hueRotate  = filterStr.match(/hue-rotate\(([\d.-]+)deg\)/)?.[1];
+    const grayscale  = filterStr.match(/grayscale\(([\d.]+)\)/)?.[1];
+    const invert     = filterStr.match(/invert\(([\d.]+)\)/)?.[1];
+    const blur       = filterStr.match(/blur\(([\d.]+)px\)/)?.[1];
+
+    if (blur)       parts.push(`<feGaussianBlur stdDeviation="${blur}"/>`);
+    if (grayscale)  parts.push(`<feColorMatrix type="saturate" values="${1 - parseFloat(grayscale)}"/>`);
+    if (sepia) {
+      const s = parseFloat(sepia);
+      parts.push(`<feColorMatrix type="matrix" values="${0.393+0.607*(1-s)} ${0.769-0.769*(1-s)} ${0.189-0.189*(1-s)} 0 0 ${0.349-0.349*(1-s)} ${0.686+0.314*(1-s)} ${0.168-0.168*(1-s)} 0 0 ${0.272-0.272*(1-s)} ${0.534-0.534*(1-s)} ${0.131+0.869*(1-s)} 0 0 0 0 0 1 0"/>`);
+    }
+    if (saturate)   parts.push(`<feColorMatrix type="saturate" values="${saturate}"/>`);
+    if (hueRotate)  parts.push(`<feColorMatrix type="hueRotate" values="${hueRotate}"/>`);
+    if (brightness) parts.push(`<feComponentTransfer><feFuncR type="linear" slope="${brightness}"/><feFuncG type="linear" slope="${brightness}"/><feFuncB type="linear" slope="${brightness}"/></feComponentTransfer>`);
+    if (contrast) {
+      const c = parseFloat(contrast);
+      const shift = (1 - c) / 2;
+      parts.push(`<feComponentTransfer><feFuncR type="linear" slope="${c}" intercept="${shift}"/><feFuncG type="linear" slope="${c}" intercept="${shift}"/><feFuncB type="linear" slope="${c}" intercept="${shift}"/></feComponentTransfer>`);
+    }
+    if (invert)     parts.push(`<feComponentTransfer><feFuncR type="linear" slope="-1" intercept="1"/><feFuncG type="linear" slope="-1" intercept="1"/><feFuncB type="linear" slope="-1" intercept="1"/></feComponentTransfer>`);
+    return parts.join("");
+  };
+
   const exportImage = async () => {
     if (!image) return;
     setExporting(true);
     triggerGlitch();
 
-    // Capture current state values to avoid stale closure
     const currentWarpX = warp.x;
     const currentWarpY = warp.y;
+    const filterStr = compositeFilter();
+
+    // Draw the image through an offscreen img with CSS filter applied.
+    // ctx.filter is unreliable on mobile Safari — we use an SVG filter
+    // embedded in a data URI as a reliable cross-browser fallback.
+    const applyFilterToCanvas = (src, w, h, filter, rot) => new Promise(resolve => {
+      const offscreen = document.createElement("canvas");
+      offscreen.width  = w;
+      offscreen.height = h;
+      const ctx2 = offscreen.getContext("2d");
+
+      const tmpImg = new window.Image();
+      tmpImg.crossOrigin = "anonymous";
+      tmpImg.onload = () => {
+        ctx2.save();
+        ctx2.translate(w / 2, h / 2);
+        ctx2.rotate((rot * Math.PI) / 180);
+        // Try ctx.filter — works on Chrome/Firefox, silently ignored on Safari
+        try { ctx2.filter = filter; } catch(e) {}
+        ctx2.drawImage(tmpImg, -tmpImg.naturalWidth / 2, -tmpImg.naturalHeight / 2);
+        ctx2.restore();
+
+        // Safari fallback: if ctx.filter had no effect, re-draw via SVG filter
+        // We detect this by checking if a known CSS filter changes pixel values
+        // Instead, just also draw via an SVG foreignObject approach
+        const svgFilter = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><filter id="f" style="color-interpolation-filters:sRGB">${cssFilterToSvg(filter)}</filter></defs><image href="${src}" width="${w}" height="${h}" filter="url(#f)"/></svg>`;
+        const svgBlob = new Blob([svgFilter], { type: "image/svg+xml" });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        const svgImg = new window.Image();
+        svgImg.onload = () => {
+          const fallback = document.createElement("canvas");
+          fallback.width = w; fallback.height = h;
+          const fCtx = fallback.getContext("2d");
+          fCtx.save();
+          fCtx.translate(w / 2, h / 2);
+          fCtx.rotate((rot * Math.PI) / 180);
+          fCtx.drawImage(svgImg, -w / 2, -h / 2);
+          fCtx.restore();
+          URL.revokeObjectURL(svgUrl);
+          resolve(fallback);
+        };
+        svgImg.onerror = () => { URL.revokeObjectURL(svgUrl); resolve(offscreen); };
+        svgImg.src = svgUrl;
+      };
+      tmpImg.src = src;
+    });
 
     const img = new Image();
     img.src = image;
-    await new Promise((res) => { img.onload = res; });
+    await new Promise((res) => { img.onload = res; if (img.complete) res(); });
 
     const isRotated90 = rotation === 90 || rotation === 270;
     const fullW = isRotated90 ? img.naturalHeight : img.naturalWidth;
     const fullH = isRotated90 ? img.naturalWidth  : img.naturalHeight;
 
-    // Apply crop to determine final canvas dimensions
-    const cropX      = crop ? Math.round(crop.x * fullW) : 0;
-    const cropY      = crop ? Math.round(crop.y * fullH) : 0;
-    const cropW      = crop ? Math.round(crop.w * fullW) : fullW;
-    const cropH      = crop ? Math.round(crop.h * fullH) : fullH;
+    const cropX = crop ? Math.round(crop.x * fullW) : 0;
+    const cropY = crop ? Math.round(crop.y * fullH) : 0;
+    const cropW = crop ? Math.round(crop.w * fullW) : fullW;
+    const cropH = crop ? Math.round(crop.h * fullH) : fullH;
 
-    // Step 1 — draw full rotated + filtered image to a temp canvas
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width  = fullW;
-    tempCanvas.height = fullH;
-    const tempCtx = tempCanvas.getContext("2d");
-    tempCtx.translate(fullW / 2, fullH / 2);
-    tempCtx.rotate((rotation * Math.PI) / 180);
-    tempCtx.filter = compositeFilter();
-    tempCtx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-    tempCtx.filter = "none";
+    // Step 1 — filtered + rotated image on temp canvas
+    const tempCanvas = await applyFilterToCanvas(image, fullW, fullH, filterStr, rotation);
 
     // Step 2 — crop + warp into final canvas
-    const preCropW = cropW;
-    const preCropH = cropH;
     const sx = currentWarpX / 100;
     const sy = currentWarpY / 100;
     const canvas = document.createElement("canvas");
-    // Final canvas is the warped size
-    canvas.width  = Math.max(1, Math.round(preCropW * sx));
-    canvas.height = Math.max(1, Math.round(preCropH * sy));
+    canvas.width  = Math.max(1, Math.round(cropW * sx));
+    canvas.height = Math.max(1, Math.round(cropH * sy));
     const ctx = canvas.getContext("2d");
-    // Draw source crop region scaled into the warped canvas dimensions
-    ctx.drawImage(
-      tempCanvas,
-      cropX, cropY, preCropW, preCropH,
-      0, 0, canvas.width, canvas.height
-    );
+    ctx.drawImage(tempCanvas, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
     // Step 3 — grain
     if (grain > 0) {
@@ -1270,9 +1328,10 @@ export default function Stills() {
           borderTop: "2px solid #4a4a4a", borderLeft: "2px solid #4a4a4a",
           borderBottom: "2px solid #111", borderRight: "2px solid #111",
           background: "#111", display: "flex", alignItems: "center",
-          justifyContent: "space-between", padding: "0 12px", flexShrink: 0, height: 96,
+          justifyContent: "space-between", padding: "0 12px", flexShrink: 0,
+          height: isMobile ? 52 : 96,
         }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: isMobile ? 8 : 14 }}>
             <span
               onClick={() => navigateTo("landing")}
               title="Return to home"
@@ -1280,31 +1339,21 @@ export default function Stills() {
               onMouseLeave={e => e.currentTarget.style.opacity = "1"}
               style={{
                 fontFamily: "'Pinyon Script', cursive",
-                fontSize: 82, color: "#C0392B",
+                fontSize: isMobile ? 36 : 82, color: "#C0392B",
                 animation: "neonBlink 2s infinite",
                 cursor: "pointer", transition: "opacity 0.15s", userSelect: "none",
               }}>Stills</span>
-            <span style={{ fontSize: 18, color: "#666", letterSpacing: "0.3em", textTransform: "uppercase", fontWeight: 300, fontFamily: F2 }}>
+            <span style={{ fontSize: isMobile ? 11 : 18, color: "#666", letterSpacing: "0.3em", textTransform: "uppercase", fontWeight: 300, fontFamily: F2 }}>
               Darkroom
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="dr-btn" onClick={() => {
-              // Fresh editor — clear everything
-              setImage(null);
-              setImageFile(null);
-              setCurrentEditId(null);
-              setActiveFilter("raw");
-              setBrightness(100);
-              setContrast(130);
-              setSaturation(100);
-              setGrain(0);
-              setVignette(false);
-              setRotation(0);
-              setNegative(false);
-              setCrop(null);
-              setScreen("splash");
-              setSplashDest("editor"); setScreen("splash");
+              setImage(null); setImageFile(null); setCurrentEditId(null);
+              setActiveFilter("raw"); setBrightness(100); setContrast(130);
+              setSaturation(100); setGrain(0); setVignette(false);
+              setRotation(0); setNegative(false); setCrop(null);
+              setScreen("splash"); setSplashDest("editor"); setScreen("splash");
             }} style={{
               background: "#1a1a1a", border: "1px solid #3a3a3a", color: "#888",
               fontFamily: F2, fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase",
@@ -2151,12 +2200,14 @@ export default function Stills() {
                   const onHandleMouseDown = (e, handleId) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    const startX = e.clientX;
-                    const startY = e.clientY;
+                    const startX = e.clientX ?? e.touches?.[0]?.clientX;
+                    const startY = e.clientY ?? e.touches?.[0]?.clientY;
                     const startCrop = { ...crop };
                     const onMove = (me) => {
-                      const dx = (me.clientX - startX) / imgW;
-                      const dy = (me.clientY - startY) / imgH;
+                      const cx = me.clientX ?? me.touches?.[0]?.clientX;
+                      const cy = me.clientY ?? me.touches?.[0]?.clientY;
+                      const dx = (cx - startX) / imgW;
+                      const dy = (cy - startY) / imgH;
                       let { x, y, w, h } = startCrop;
                       if (handleId.includes("l")) { x = Math.max(0, Math.min(startCrop.x + dx, startCrop.x + startCrop.w - 0.05)); w = startCrop.w - (x - startCrop.x); }
                       if (handleId.includes("r")) { w = Math.max(0.05, Math.min(startCrop.w + dx, 1 - startCrop.x)); }
@@ -2165,28 +2216,44 @@ export default function Stills() {
                       if (crop?.ratio) { h = w / crop.ratio; }
                       setCrop(c => ({ ...c, x: Math.max(0, x), y: Math.max(0, y), w: Math.min(w, 1 - Math.max(0,x)), h: Math.min(h, 1 - Math.max(0,y)) }));
                     };
-                    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+                    const onUp = () => {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                      window.removeEventListener("touchmove", onMove);
+                      window.removeEventListener("touchend", onUp);
+                    };
                     window.addEventListener("mousemove", onMove);
                     window.addEventListener("mouseup", onUp);
+                    window.addEventListener("touchmove", onMove, { passive: false });
+                    window.addEventListener("touchend", onUp);
                   };
 
                   const onCropDrag = (e) => {
                     e.preventDefault();
-                    const startX = e.clientX;
-                    const startY = e.clientY;
+                    const startX = e.clientX ?? e.touches?.[0]?.clientX;
+                    const startY = e.clientY ?? e.touches?.[0]?.clientY;
                     const startCrop = { ...crop };
                     const onMove = (me) => {
-                      const dx = (me.clientX - startX) / imgW;
-                      const dy = (me.clientY - startY) / imgH;
+                      const cx = me.clientX ?? me.touches?.[0]?.clientX;
+                      const cy = me.clientY ?? me.touches?.[0]?.clientY;
+                      const dx = (cx - startX) / imgW;
+                      const dy = (cy - startY) / imgH;
                       setCrop(c => ({
                         ...c,
                         x: Math.max(0, Math.min(startCrop.x + dx, 1 - startCrop.w)),
                         y: Math.max(0, Math.min(startCrop.y + dy, 1 - startCrop.h)),
                       }));
                     };
-                    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+                    const onUp = () => {
+                      window.removeEventListener("mousemove", onMove);
+                      window.removeEventListener("mouseup", onUp);
+                      window.removeEventListener("touchmove", onMove);
+                      window.removeEventListener("touchend", onUp);
+                    };
                     window.addEventListener("mousemove", onMove);
                     window.addEventListener("mouseup", onUp);
+                    window.addEventListener("touchmove", onMove, { passive: false });
+                    window.addEventListener("touchend", onUp);
                   };
 
                   return (
@@ -2196,6 +2263,7 @@ export default function Stills() {
                       {/* Crop window cutout */}
                       <div
                         onMouseDown={onCropDrag}
+                        onTouchStart={onCropDrag}
                         style={{
                           position: "absolute",
                           left: cx, top: cy, width: cw, height: ch,
@@ -2231,16 +2299,19 @@ export default function Stills() {
                         <div
                           key={h.id}
                           onMouseDown={e => onHandleMouseDown(e, h.id)}
+                          onTouchStart={e => { e.stopPropagation(); onHandleMouseDown(e, h.id); }}
                           style={{
                             position: "absolute",
                             left: h.x - handleSize/2,
                             top: h.y - handleSize/2,
-                            width: handleSize, height: handleSize,
+                            width: isMobile ? 28 : handleSize,
+                            height: isMobile ? 28 : handleSize,
                             background: "#C0392B",
                             border: "1px solid #fff",
                             cursor: h.cursor,
                             pointerEvents: "all",
                             zIndex: 10,
+                            touchAction: "none",
                           }}
                         />
                       ))}
