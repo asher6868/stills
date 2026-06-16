@@ -578,15 +578,40 @@ export default function Stills() {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const dataUrl = e.target.result;
-      setImage(dataUrl);
-      setCrop(null);
-      triggerGlitch();
-      file._convertedDataUrl = dataUrl;
-      if (navigateAfter) {
-        setSplashDest("editor");
-        setScreen("splash");
-      }
+      const rawDataUrl = e.target.result;
+
+      // Normalise EXIF orientation by drawing through a canvas.
+      // This bakes the correct rotation into pixel data so crop coords
+      // are consistent regardless of device orientation or browser handling.
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const normalisedUrl = canvas.toDataURL("image/jpeg", 0.95);
+        setImage(normalisedUrl);
+        setCrop(null);
+        triggerGlitch();
+        file._convertedDataUrl = normalisedUrl;
+        if (navigateAfter) {
+          setSplashDest("editor");
+          setScreen("splash");
+        }
+      };
+      img.onerror = () => {
+        // Fallback: use raw data URL if canvas fails
+        setImage(rawDataUrl);
+        setCrop(null);
+        triggerGlitch();
+        file._convertedDataUrl = rawDataUrl;
+        if (navigateAfter) {
+          setSplashDest("editor");
+          setScreen("splash");
+        }
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(processedFile);
   };
