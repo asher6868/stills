@@ -1529,28 +1529,29 @@ export default function Stills() {
                       borderBottom: "2px solid #111", borderRight: "2px solid #111",
                       transition: "transform 0.15s, border-color 0.15s",
                       cursor: "pointer",
+                      overflow: "hidden",
                     }}
-                  >
-                    <div style={{ overflow: "hidden" }}>
-                      <img
-                        src={item.dataUrl}
-                        alt={item.filterName}
-                        style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
-                      />
-                    </div>
-                    <div style={{ padding: "8px 10px 10px", borderTop: "1px solid #2a2a2a", background: "#222" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#ccc", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                            {num}. {item.filterName}
+                    >
+                      <div style={{ overflow: "hidden" }}>
+                        <img
+                          src={item.dataUrl}
+                          alt={item.filterName}
+                          style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                        />
+                      </div>
+                      <div style={{ padding: "8px 10px 10px", borderTop: "1px solid #2a2a2a", background: "#222" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
+                          <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#ccc", letterSpacing: "0.08em", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {num}. {item.filterName}
+                            </div>
+                            <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.06em", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {item.filename}
+                            </div>
+                            <div style={{ fontSize: 9, color: "#444", letterSpacing: "0.06em", marginTop: 2 }}>
+                              {item.date}
+                            </div>
                           </div>
-                          <div style={{ fontSize: 9, color: "#666", letterSpacing: "0.06em", marginTop: 4 }}>
-                            {item.filename}
-                          </div>
-                          <div style={{ fontSize: 9, color: "#444", letterSpacing: "0.06em", marginTop: 2 }}>
-                            {item.date}
-                          </div>
-                        </div>
                         {/* Delete button — visible, triggers confirmation */}
                         <button
                           onClick={e => {
