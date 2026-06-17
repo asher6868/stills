@@ -1527,17 +1527,19 @@ export default function Stills() {
                       background: "#222",
                       borderTop: "2px solid #3a3a3a", borderLeft: "2px solid #3a3a3a",
                       borderBottom: "2px solid #111", borderRight: "2px solid #111",
-                      overflow: "hidden", transition: "transform 0.15s, border-color 0.15s",
+                      transition: "transform 0.15s, border-color 0.15s",
                       cursor: "pointer",
                     }}
                   >
-                    <img
-                      src={item.dataUrl}
-                      alt={item.filterName}
-                      style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
-                    />
+                    <div style={{ overflow: "hidden" }}>
+                      <img
+                        src={item.dataUrl}
+                        alt={item.filterName}
+                        style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", display: "block" }}
+                      />
+                    </div>
                     <div style={{ padding: "8px 10px 10px", borderTop: "1px solid #2a2a2a", background: "#222" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
                         <div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#ccc", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                             {num}. {item.filterName}
